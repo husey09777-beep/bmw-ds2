@@ -187,6 +187,31 @@
   .bottombar button.red { color: #ff9c97; }
   .bottombar .sp { flex: 1; }
 
+  /* ===== Телефон ===== */
+  @media (max-width: 600px) {
+    body { font-size: 14px; }
+    .topbar { gap: 8px; padding: 0 10px; height: 48px; }
+    .brand { font-size: 0; gap: 0; }               /* на узком экране остаётся только эмблема */
+    .crumbs { font-size: 12.5px; }
+    .crumbs span:not(:last-child), .crumbs i { display: none; }
+    .vci { padding: 6px; } .vci span, .clock { display: none; }
+    .vehicle { gap: 4px 14px; padding: 6px 12px; font-size: 12px; }
+    .screen { padding: 12px; }
+    .title { font-size: 16px; flex-wrap: wrap; gap: 2px 10px; }
+    .tiles { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .tile { padding: 14px 8px 12px; }
+    .tile .ic { width: 52px; height: 52px; border-radius: 12px; }
+    .tile .ic svg { width: 28px; height: 28px; }
+    .tile .ds { font-size: 11px; }
+    .grid th, .grid td { padding: 9px 10px; }
+    .bottombar { padding: 4px 2px calc(4px + env(safe-area-inset-bottom)); gap: 0; }
+    .bottombar .sp { flex: 0; }
+    .bottombar button { flex: 1 1 0; min-width: 0; padding: 6px 2px; font-size: 10.5px; }
+    .bottombar button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    canvas { height: 170px; }
+    .form { padding: 12px; }
+  }
+
   /* Модальное окно */
   .modal { position: fixed; inset: 0; background: rgba(10,20,35,.55); display: none; place-items: center; z-index: 10; }
   .modal.show { display: grid; }
@@ -421,9 +446,41 @@ function log(cls, text) {
   if (el) { el.insertAdjacentHTML('beforeend', `<span class="${cls}">${esc(LOG.at(-1).text)}</span>\n`); el.scrollTop = el.scrollHeight; }
 }
 
-// ===================== Транспорт: кабель через Web Serial =====================
-class SerialTransport {
+// ===================== Транспорт: общая часть (буфер приёма, эхо, разбор ответа) =====================
+class ByteTransport {
   constructor() { this.buf = []; this.waiters = []; }
+  push(bytes) {
+    for (const b of bytes) this.buf.push(b);
+    this.waiters.forEach(w => w());
+  }
+  waitBytes(n, timeout) {
+    return new Promise((resolve, reject) => {
+      if (this.buf.length >= n) return resolve();
+      const check = () => { if (this.buf.length >= n) { done(); resolve(); } };
+      const timer = setTimeout(() => { done(); reject(new Error('timeout')); }, timeout);
+      const done = () => { clearTimeout(timer); this.waiters = this.waiters.filter(w => w !== check); };
+      this.waiters.push(check);
+    });
+  }
+  async request(msg, timeout = 1000) {
+    this.buf = [];
+    await this.send(new Uint8Array(msg));
+    // KKL-кабели возвращают эхо отправленных байт — убираем его
+    try {
+      await this.waitBytes(msg.length, 300);
+      if (this.buf.slice(0, msg.length).every((b, i) => b === msg[i])) this.buf.splice(0, msg.length);
+    } catch { /* эха нет */ }
+    await this.waitBytes(2, timeout);
+    const len = this.buf[1];
+    if (len < 3) throw new Error('некорректная длина ответа');
+    await this.waitBytes(len, timeout);
+    return this.buf.splice(0, len);
+  }
+}
+
+// ===================== Транспорт: кабель через Web Serial (Windows / macOS / Linux) =====================
+class SerialTransport extends ByteTransport {
+  get label() { return 'USB K-line (KKL / K+DCAN)'; }
   async open() {
     if (!('serial' in navigator)) throw new Error('Браузер не поддерживает Web Serial. Откройте страницу в Chrome или Edge.');
     this.port = await navigator.serial.requestPort();
@@ -437,41 +494,90 @@ class SerialTransport {
       while (true) {
         const { value, done } = await this.reader.read();
         if (done) break;
-        for (const b of value) this.buf.push(b);
-        this.waiters.forEach(w => w());
+        this.push(value);
       }
     } catch (e) { log('er', 'Ошибка чтения порта: ' + e.message); }
     finally { this.reader.releaseLock(); }
   }
-  waitBytes(n, timeout) {
-    return new Promise((resolve, reject) => {
-      if (this.buf.length >= n) return resolve();
-      const check = () => { if (this.buf.length >= n) { done(); resolve(); } };
-      const timer = setTimeout(() => { done(); reject(new Error('timeout')); }, timeout);
-      const done = () => { clearTimeout(timer); this.waiters = this.waiters.filter(w => w !== check); };
-      this.waiters.push(check);
-    });
-  }
-  async request(msg, timeout = 1000) {
-    this.buf = [];
-    await this.writer.write(new Uint8Array(msg));
-    // KKL-кабели возвращают эхо отправленных байт — убираем его
-    try {
-      await this.waitBytes(msg.length, 300);
-      if (this.buf.slice(0, msg.length).every((b, i) => b === msg[i])) this.buf.splice(0, msg.length);
-    } catch { /* эха нет */ }
-    await this.waitBytes(2, timeout);
-    const len = this.buf[1];
-    if (len < 3) throw new Error('некорректная длина ответа');
-    await this.waitBytes(len, timeout);
-    return this.buf.splice(0, len);
-  }
+  send(data) { return this.writer.write(data); }
   async close() {
     try { await this.reader?.cancel(); } catch {}
     try { this.writer?.releaseLock(); } catch {}
     try { await this.port?.close(); } catch {}
   }
 }
+
+// ===================== Транспорт: кабель FTDI через WebUSB (Android) =====================
+// Приложение само настраивает чип FTDI управляющими запросами, как это делает драйвер на компьютере.
+const FTDI = {
+  VID: 0x0403,
+  RESET: 0x00, MODEM_CTRL: 0x01, FLOW_CTRL: 0x02, BAUDRATE: 0x03, DATA: 0x04, LATENCY: 0x09,
+  BAUD_9600: 0x4138,                    // делитель 312,5 от 3 МГц
+  DATA_8E1: 0x0008 | (2 << 8),          // 8 бит, чётность even, 1 стоп-бит
+  DTR_RTS_ON: 0x0303,
+};
+class UsbFtdiTransport extends ByteTransport {
+  get label() { return 'USB FTDI (WebUSB, Android)'; }
+  async open() {
+    if (!('usb' in navigator)) throw new Error('Браузер не поддерживает WebUSB. Откройте страницу в Chrome на Android.');
+    this.dev = await navigator.usb.requestDevice({ filters: [{ vendorId: FTDI.VID }] });
+    await this.dev.open();
+    if (!this.dev.configuration) await this.dev.selectConfiguration(1);
+    const iface = this.dev.configuration.interfaces[0];
+    try { await this.dev.claimInterface(iface.interfaceNumber); }
+    catch (e) {
+      throw new Error('Не удалось захватить кабель. На компьютере его занимает драйвер — там используйте обычное подключение. (' + e.message + ')');
+    }
+    const eps = iface.alternate.endpoints;
+    this.epIn = eps.find(e => e.direction === 'in' && e.type === 'bulk');
+    this.epOut = eps.find(e => e.direction === 'out' && e.type === 'bulk');
+    if (!this.epIn || !this.epOut) throw new Error('У устройства нет нужных каналов обмена — похоже, это не кабель FTDI.');
+    this.index = iface.interfaceNumber + 1;   // порт A
+    await this.ctrl(FTDI.RESET, 0);
+    await this.ctrl(FTDI.BAUDRATE, FTDI.BAUD_9600, 0);
+    await this.ctrl(FTDI.DATA, FTDI.DATA_8E1);
+    await this.ctrl(FTDI.FLOW_CTRL, 0);
+    await this.ctrl(FTDI.MODEM_CTRL, FTDI.DTR_RTS_ON);
+    await this.ctrl(FTDI.LATENCY, 2);          // быстрее отдавать ответ (по умолчанию 16 мс)
+    this.closed = false;
+    this.onDisc = e => { if (e.device === this.dev) { this.closed = true; log('er', 'Кабель отключён от телефона.'); } };
+    navigator.usb.addEventListener('disconnect', this.onDisc);
+    this.readLoop();
+  }
+  async ctrl(request, value, index = this.index) {
+    const r = await this.dev.controlTransferOut({ requestType: 'vendor', recipient: 'device', request, value, index });
+    if (r.status !== 'ok') throw new Error('FTDI: ошибка настройки (запрос ' + request + ')');
+  }
+  async readLoop() {
+    const size = this.epIn.packetSize || 64;
+    while (!this.closed) {
+      try {
+        const r = await this.dev.transferIn(this.epIn.endpointNumber, size);
+        if (r.status === 'stall') { await this.dev.clearHalt('in', this.epIn.endpointNumber); continue; }
+        const d = r.data;
+        // FTDI добавляет 2 байта статуса в начало каждого пакета по 64 байта
+        for (let off = 0; d && off < d.byteLength; off += size) {
+          const end = Math.min(off + size, d.byteLength);
+          if (end - off > 2) this.push(new Uint8Array(d.buffer, d.byteOffset + off + 2, end - off - 2));
+        }
+      } catch (e) {
+        if (!this.closed) log('er', 'Ошибка чтения USB: ' + e.message);
+        break;
+      }
+    }
+  }
+  async send(data) {
+    const r = await this.dev.transferOut(this.epOut.endpointNumber, data);
+    if (r.status !== 'ok') throw new Error('FTDI: ошибка отправки');
+  }
+  async close() {
+    this.closed = true;
+    navigator.usb?.removeEventListener('disconnect', this.onDisc);
+    try { await this.dev?.releaseInterface(this.dev.configuration.interfaces[0].interfaceNumber); } catch {}
+    try { await this.dev?.close(); } catch {}
+  }
+}
+const IS_ANDROID = /Android/i.test(navigator.userAgent);
 
 // ===================== Транспорт: демо (выдуманные ответы) =====================
 class DemoTransport {
@@ -589,15 +695,17 @@ function setVci(m) {
   mode = m;
   $('vci').className = 'vci' + (m === 'demo' ? ' demo' : m ? ' on' : '');
   $('vciText').textContent = m === 'demo' ? 'Демо-режим' : m ? 'Адаптер подключён' : 'Адаптер не подключён';
-  $('vehAdapter').textContent = m === 'demo' ? 'демо (данные выдуманы)' : m ? 'USB K-line (KKL / K+DCAN)' : '—';
+  $('vehAdapter').textContent = m === 'demo' ? 'демо (данные выдуманы)' : m ? transport.label : '—';
 }
 async function connect(kind) {
   try {
-    transport = kind === 'demo' ? new DemoTransport() : new SerialTransport();
+    transport = kind === 'demo' ? new DemoTransport() : kind === 'usb' ? new UsbFtdiTransport() : new SerialTransport();
     await transport.open();
     setVci(kind);
-    log('inf', kind === 'demo' ? 'Демо-режим: ответы генерируются, машина не нужна.' : 'Порт открыт: 9600 бод, 8E1.');
+    log('inf', kind === 'demo' ? 'Демо-режим: ответы генерируются, машина не нужна.'
+      : kind === 'usb' ? 'Кабель FTDI настроен через WebUSB: 9600 бод, 8E1.' : 'Порт открыт: 9600 бод, 8E1.');
   } catch (e) {
+    try { await transport?.close(); } catch {}
     transport = null;
     if (e.name !== 'NotFoundError') modal('Ошибка подключения', esc(e.message), [['OK', 0, 1]]);
   }
@@ -612,9 +720,12 @@ const SCREENS = {
     draw(v) {
       v.appendChild(h('<div class="title">Диагностика BMW <small>DS2 · модели до 2001 г.</small></div>'));
       const g = h('<div class="tiles"></div>');
+      const useUsb = IS_ANDROID || (!('serial' in navigator) && 'usb' in navigator);
       if (!transport) {
-        g.append(tile('plug', 'c1', 'Подключить адаптер', 'USB-кабель KKL / K+DCAN', () => connect('serial')),
-                 tile('demo', 'c3', 'Демо-режим', 'Без машины, данные выдуманы', () => connect('demo')));
+        g.append(useUsb
+          ? tile('plug', 'c1', 'Подключить кабель', 'USB OTG, кабель на чипе FTDI', () => connect('usb'))
+          : tile('plug', 'c1', 'Подключить адаптер', 'USB-кабель KKL / K+DCAN', () => connect('serial')),
+          tile('demo', 'c3', 'Демо-режим', 'Без машины, данные выдуманы', () => connect('demo')));
       }
       g.append(
         tile('scan', 'c2', 'Автоскан', 'Опрос всех блоков', () => { if (!needConn()) go('autoscan', { start: true }); }, !transport),
@@ -626,7 +737,9 @@ const SCREENS = {
       );
       if (transport) g.append(tile('off', 'c4', 'Отключить', mode === 'demo' ? 'Выйти из демо' : 'Закрыть порт', disconnect));
       v.appendChild(g);
-      if (!('serial' in navigator)) v.appendChild(h('<div class="hint bad">Этот браузер не поддерживает Web Serial — доступен только демо-режим. Откройте страницу в Chrome или Edge.</div>'));
+      if (useUsb && !('usb' in navigator)) v.appendChild(h('<div class="hint bad">Этот браузер не умеет работать с USB-устройствами — доступен только демо-режим. Откройте страницу в Chrome для Android.</div>'));
+      else if (!useUsb && !('serial' in navigator)) v.appendChild(h('<div class="hint bad">Этот браузер не поддерживает Web Serial — доступен только демо-режим. Откройте страницу в Chrome или Edge.</div>'));
+      else if (useUsb && !transport) v.appendChild(h('<div class="hint info">На телефоне работают только кабели на чипе <b>FTDI</b> (FT232). Подключите кабель через переходник USB OTG, затем нажмите «Подключить кабель» и выберите его в списке.</div>'));
     },
   },
 
@@ -786,6 +899,10 @@ const SCREENS = {
         <p>Для KKL-кабеля <b>замкните контакты 7 и 8</b> в переходнике, иначе двигатель может не ответить. На K+DCAN включите режим «7+8».</p>
         <h3>3. Подключение</h3>
         <p>Зажигание — в положение 2 (приборка горит). Откройте страницу в Chrome или Edge, нажмите «Подключить адаптер» и выберите COM-порт кабеля.</p>
+        <h3>4. Телефон на Android</h3>
+        <p>Нужны <b>Chrome для Android</b>, переходник <b>USB OTG</b> (USB-C или micro-USB → обычный USB) и кабель на чипе <b>FTDI</b> (FT232RL). Кабели на CH340 с телефона не работают.</p>
+        <p>Откройте сайт по ссылке (с файла на телефоне подключение не заработает), нажмите «Подключить кабель» и выберите кабель в списке. Если телефон спросит, каким приложением открыть устройство, выберите Chrome.</p>
+        <p>iPhone не поддерживается: Safari не даёт сайтам доступ к USB-устройствам.</p>
       </div>`));
     },
   },
