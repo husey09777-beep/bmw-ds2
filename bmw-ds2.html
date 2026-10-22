@@ -1458,7 +1458,8 @@ class Gauge {
   }
   render(showValue = false) {
     const f = clamp01((this.cur - this.p.min) / this.span);
-    const warn = this.has && this.p.warn != null && this.target >= this.p.warn;
+    // Красный — по тому значению, которое сейчас видно на приборе
+    const warn = this.has && this.p.warn != null && this.cur >= this.p.warn;
     this.el.classList.toggle('warn', warn);
     const txt = showValue ? fmt(this.cur, this.p.dec) : '—';
     if (this.val.textContent !== txt) this.val.textContent = txt;
