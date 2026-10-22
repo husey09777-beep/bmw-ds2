@@ -7,23 +7,40 @@
 <style>
   :root {
     --bar: #14233a; --bar2: #1d3253; --bg: #e9edf2; --card: #ffffff; --line: #d4dae3;
-    --text: #1b2430; --muted: #6b7686; --blue: #1677d2; --blue2: #0f5fae;
-    --ok: #1f9d55; --warn: #e08a00; --err: #d93a35;
+    /* цвета подобраны под контраст не ниже 4,5:1 на белом и на фоне */
+    --text: #1b2430; --muted: #566170; --blue: #1677d2; --blue2: #0f5fae;
+    --ok: #157a42; --warn: #a35f00; --err: #c62f2a;
     --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
   }
   * { box-sizing: border-box; }
+  html { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, "Segoe UI", sans-serif;
-         display: flex; flex-direction: column; user-select: none; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, "Segoe UI", sans-serif;
+         display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+  /* выделять текст можно везде, кроме панелей и кнопок */
+  .topbar, .bottombar, .tile, button, #splash { -webkit-user-select: none; user-select: none; }
+
+  /* Фокус с клавиатуры */
+  :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+  .topbar :focus-visible, .bottombar :focus-visible, .dlg h4 :focus-visible { outline-color: #8cc4ff; }
+  #view:focus { outline: none; }
+  .skip { position: absolute; left: 8px; top: -80px; z-index: 300; background: var(--blue); color: #fff; padding: 12px 16px; border-radius: 8px; font-weight: 600; text-decoration: none; }
+  .skip:focus { top: 8px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .ico { display: inline-block; width: 16px; height: 16px; vertical-align: -3px; }
+  .ico svg { width: 100%; height: 100%; display: block; }
 
   /* Верхняя панель */
   .topbar { background: linear-gradient(var(--bar2), var(--bar)); color: #fff; display: flex; align-items: center; gap: 16px; padding: 0 16px; height: 52px; flex: none; }
   .brand { font-weight: 700; letter-spacing: .04em; display: flex; align-items: center; gap: 8px; }
   .brand .logo { width: 26px; height: 26px; border-radius: 50%; border: 3px solid #fff; background: conic-gradient(#1677d2 0 25%, #fff 0 50%, #1677d2 0 75%, #fff 0); }
   .crumbs { flex: 1; display: flex; gap: 6px; align-items: center; font-size: 14px; color: #b9c6d8; overflow: hidden; white-space: nowrap; }
-  .crumbs span { cursor: pointer; } .crumbs span:last-child { color: #fff; cursor: default; }
+  .crumb { font: inherit; color: inherit; background: none; border: 0; padding: 0 4px; min-height: 44px; cursor: pointer; border-radius: 6px; white-space: nowrap; }
+  .crumb:hover { color: #fff; }
+  .crumb[aria-current] { color: #fff; cursor: default; }
   .crumbs i { font-style: normal; opacity: .5; }
   .vci { display: flex; align-items: center; gap: 8px; font-size: 13px; background: rgba(255,255,255,.08); padding: 5px 10px; border-radius: 6px; }
+  .vci-short { display: none; }
   .vci .led { width: 10px; height: 10px; border-radius: 50%; background: #5b6b80; box-shadow: inset 0 0 2px #000; }
   .vci.on .led { background: #33d17a; box-shadow: 0 0 6px #33d17a; }
   .vci.demo .led { background: #ffb020; box-shadow: 0 0 6px #ffb020; }
@@ -41,11 +58,13 @@
 
   /* Плитки */
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
-  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px 12px 14px; text-align: center; cursor: pointer;
-          box-shadow: 0 1px 2px rgba(0,0,0,.05); transition: transform .08s, box-shadow .08s; }
-  .tile:hover { box-shadow: 0 4px 14px rgba(20,35,58,.15); transform: translateY(-1px); }
-  .tile:active { transform: translateY(1px); }
-  .tile.disabled { opacity: .45; pointer-events: none; }
+  .tile { font: inherit; color: inherit; width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px 12px 14px; text-align: center; cursor: pointer;
+          box-shadow: 0 1px 2px rgba(0,0,0,.05); transition: transform .12s cubic-bezier(.2,.8,.2,1), box-shadow .15s; }
+  .tile:hover:not(:disabled) { box-shadow: 0 4px 14px rgba(20,35,58,.15); transform: translateY(-1px); }
+  .tile:active:not(:disabled) { transform: scale(.97); transition-duration: .06s; }
+  .tile:disabled, .tile.off { opacity: .5; }
+  .tile.off { cursor: help; }
+  .tile .nm, .tile .ds { display: block; }
   .tile .ic { width: 64px; height: 64px; margin: 0 auto 10px; border-radius: 14px; display: grid; place-items: center; color: #fff; }
   .tile .ic svg { width: 34px; height: 34px; }
   .tile .nm { font-weight: 600; } .tile .ds { font-size: 12px; color: var(--muted); margin-top: 3px; }
@@ -67,7 +86,7 @@
   .b-wait { background: #eef1f5; color: var(--muted); } .b-warn { background: #fff3dc; color: var(--warn); }
   .b-run { background: #e3effc; color: var(--blue); }
   .progress { height: 6px; background: #dfe4ea; border-radius: 3px; overflow: hidden; margin-bottom: 14px; }
-  .progress div { height: 100%; width: 0; background: var(--blue); transition: width .2s; }
+  .progress div { height: 100%; width: 100%; background: var(--blue); transform-origin: left; transform: scaleX(0); transition: transform .25s ease-out; }
   .hint { background: #fff8e6; border: 1px solid #f5dfa8; color: #7a5a00; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-top: 14px; }
   .hint.info { background: #eaf3fd; border-color: #c6dcf5; color: #1d4f85; }
   .hint.bad { background: #fdecea; border-color: #f4c3c0; color: #8c201c; }
@@ -81,7 +100,7 @@
   .graph-head { padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
   .graph-head b { color: var(--text); font-size: 20px; font-family: var(--mono); margin-left: 6px; }
 
-  input.field, select.field { font: inherit; font-family: var(--mono); padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--text); }
+  input.field, select.field { font: inherit; font-family: var(--mono); padding: 9px 11px; min-height: 44px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--text); }
   label.lbl { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
   .form { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; padding: 14px; }
 
@@ -96,26 +115,28 @@
   .dtc:last-child { border-bottom: none; }
   .dtc-code { font-family: var(--mono); font-weight: 700; font-size: 18px; color: var(--err); background: #fdecea; border-radius: 6px; text-align: center; padding: 6px 4px; }
   .dtc-code.unk { color: var(--muted); background: #eef1f5; }
-  .dtc-code small { display: block; font-size: 10px; font-weight: 400; color: var(--muted); }
+  .dtc-code small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
   .dtc-plain { font-weight: 600; font-size: 15px; }
   .dtc-off { font-weight: 400; color: var(--muted); }
   .dtc-meta { font-size: 12px; color: var(--muted); margin-top: 2px; font-family: var(--mono); }
   .dtc-fix { grid-column: 2 / 4; background: #f6f8fb; border-radius: 8px; padding: 10px 14px; margin-top: 6px; font-size: 13.5px; }
   .dtc-fix b { display: block; margin-bottom: 4px; }
   .dtc-fix ol { margin: 0; padding-left: 20px; } .dtc-fix li { margin: 3px 0; }
-  .dtc .lnk { font: inherit; font-size: 12px; color: var(--blue); background: none; border: 1px solid #c6dcf5; border-radius: 6px; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
+  .dtc .lnk { font: inherit; font-size: 13px; color: var(--blue); background: none; border: 1px solid #c6dcf5; border-radius: 6px; padding: 5px 12px; min-height: 44px; cursor: pointer; white-space: nowrap; }
   .dtc .lnk:hover { background: #eaf3fd; }
   .sumbar { padding: 12px 16px; border-bottom: 1px solid var(--line); background: #fff7f6; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
   .sumbar b.n { font-size: 20px; color: var(--err); }
-  .search { width: 100%; font: inherit; padding: 11px 14px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 14px; background: #fff; }
+  .search { width: 100%; font: inherit; padding: 11px 14px; min-height: 48px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 14px; background: #fff; color: var(--text); }
   @media (max-width: 600px) { .dtc { grid-template-columns: 70px 1fr; } .dtc-fix { grid-column: 1 / 3; } .dtc .lnk { grid-column: 1 / 3; justify-self: start; } }
 
   .okc { color: var(--ok) !important; background: #e2f5ea !important; }
 
   /* Переключатель темы */
-  .themebtn { background: rgba(255,255,255,.08); border: 0; color: #c9d4e3; width: 34px; height: 34px; border-radius: 6px; cursor: pointer; display: grid; place-items: center; }
+  .themebtn { background: rgba(255,255,255,.08); border: 0; color: #c9d4e3; width: 44px; height: 44px; flex: none; border-radius: 8px; cursor: pointer; display: grid; place-items: center; transition: transform .1s; }
   .themebtn:hover { background: rgba(255,255,255,.16); color: #fff; }
-  .themebtn svg { width: 18px; height: 18px; }
+  .themebtn:active { transform: scale(.92); }
+  .themebtn[aria-pressed="true"] { background: rgba(255,255,255,.22); color: #fff; }
+  .themebtn svg { width: 20px; height: 20px; }
 
   /* ===== Тёмная тема ===== */
   :root[data-theme="dark"] {
@@ -177,11 +198,17 @@
 
   /* Нижняя панель */
   .bottombar { background: var(--bar); flex: none; display: flex; gap: 2px; padding: 6px 8px; }
-  .bottombar button { flex: 0 0 auto; min-width: 92px; background: transparent; border: 0; color: #c9d4e3; border-radius: 6px; padding: 6px 10px;
-                      font: inherit; font-size: 12px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .bottombar button { flex: 0 0 auto; min-width: 92px; min-height: 52px; background: transparent; border: 0; color: #c9d4e3; border-radius: 8px; padding: 6px 10px;
+                      font: inherit; font-size: 12px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+                      transition: transform .1s, background-color .15s; }
   .bottombar button svg { width: 22px; height: 22px; }
   .bottombar button:hover:not(:disabled) { background: rgba(255,255,255,.08); color: #fff; }
-  .bottombar button:disabled { opacity: .3; cursor: default; }
+  .bottombar button:active:not(:disabled) { transform: scale(.94); }
+  .bottombar button:disabled { opacity: .4; cursor: not-allowed; }
+  .bottombar button.busy { cursor: progress; }
+  .bottombar button.busy svg { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .bottombar button.busy svg { animation: none; } }
   .bottombar button.act { background: var(--blue); color: #fff; }
   .bottombar button.act:hover:not(:disabled) { background: var(--blue2); }
   .bottombar button.red { color: #ff9c97; }
@@ -191,44 +218,53 @@
   .gauges { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
   .gauge { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px 10px;
            animation: gIn .6s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i) * 80ms); }
+  .g-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 22px; }
   .g-name { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .g-alert { display: none; align-items: center; gap: 4px; flex: none; font-size: 12px; font-weight: 700; color: var(--err); }
+  .g-alert .ico { width: 14px; height: 14px; }
+  .gauge.warn .g-alert { display: inline-flex; }
   .g-svg { display: block; width: 100%; max-width: 260px; margin: 2px auto 0; overflow: visible; }
   .g-track { fill: none; stroke: var(--line); stroke-width: 10; stroke-linecap: round; }
   .g-arc { fill: none; stroke-width: 10; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(22,119,210,.45)); }
   .g-warnzone { fill: none; stroke: var(--err); stroke-width: 3; opacity: .75; stroke-linecap: round; }
   .g-tick { stroke: var(--muted); stroke-width: 1.2; opacity: .55; } .g-tick.maj { stroke-width: 2.2; opacity: .9; }
-  .g-lbl { fill: var(--muted); font: 9px var(--mono); text-anchor: middle; }
+  .g-lbl { fill: var(--muted); font: 11px var(--mono); text-anchor: middle; }
   .g-needle line { stroke: var(--err); stroke-width: 3.2; stroke-linecap: round; }
   .g-needle circle { fill: var(--text); } .g-needle .g-cap { fill: var(--err); }
   .g-needle { filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
   .g-svg .g-val { fill: var(--text); font: 700 25px var(--mono); text-anchor: middle; }
-  .g-unit { fill: var(--muted); font-size: 11px; text-anchor: middle; }
+  .g-unit { fill: var(--muted); font-size: 13px; text-anchor: middle; }
   .g-big { display: flex; align-items: baseline; gap: 8px; margin: 18px 0 12px; }
   .g-big .g-val { font: 700 38px/1 var(--mono); letter-spacing: -.02em; transition: color .3s; }
   .g-big small { font-size: 14px; color: var(--muted); }
   .g-bar { position: relative; height: 12px; background: var(--line); border-radius: 6px; overflow: hidden; }
   .gt-number .g-bar { height: 4px; }
-  .g-fill { height: 100%; width: 0; border-radius: 6px; background: linear-gradient(90deg, var(--blue), #6fd3ff); box-shadow: 0 0 10px rgba(22,119,210,.5); }
+  /* заполнение анимируется через transform — плавнее на слабых телефонах */
+  .g-fill { height: 100%; width: 100%; transform-origin: left center; transform: scaleX(0); background: linear-gradient(90deg, var(--blue), #6fd3ff); }
   .g-mark { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--err); }
-  .g-range { display: flex; justify-content: space-between; font: 11px var(--mono); color: var(--muted); margin-top: 6px; }
+  .g-range { display: flex; justify-content: space-between; font: 12px var(--mono); color: var(--muted); margin-top: 6px; }
   .gauge.warn { border-color: rgba(217,58,53,.6); }
   .gauge.warn::after { content: ''; position: absolute; inset: -1px; border-radius: 14px; border: 2px solid var(--err); pointer-events: none; animation: gPulse 1.1s ease-in-out infinite; }
   .gauge.warn .g-big .g-val { color: var(--err); }
   .gauge.warn .g-svg .g-val { fill: var(--err); }
-  .gauge.warn .g-fill { background: linear-gradient(90deg, #f39b1f, var(--err)); box-shadow: 0 0 10px rgba(217,58,53,.5); }
+  .gauge.warn .g-fill { background: linear-gradient(90deg, #f39b1f, var(--err)); }
   @keyframes gIn { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
   @keyframes gPulse { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
   @media (prefers-reduced-motion: reduce) { .gauge, .gauge.warn::after { animation: none; } }
   .dash-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
-  .lnk { font: inherit; font-size: 13px; color: var(--blue); background: var(--card); border: 1px solid var(--line); border-radius: 7px; padding: 7px 12px; cursor: pointer; }
+  .lnk { font: inherit; font-size: 14px; color: var(--blue); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; min-height: 44px; cursor: pointer; transition: transform .1s; }
   .lnk:hover { border-color: var(--blue); }
+  .lnk:active { transform: scale(.96); }
 
   /* Таблица потока данных и форма подписи */
   .grid.live td { padding-top: 8px; padding-bottom: 8px; }
   .pc b { font-weight: 600; } .pv { color: var(--blue); margin-left: 6px; white-space: nowrap; }
   .pc-none { color: var(--muted); font-size: 12px; }
-  .pen { font: inherit; width: 32px; height: 30px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--blue); cursor: pointer; }
+  .pen { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--blue); cursor: pointer; transition: transform .1s; }
+  .pen svg { width: 18px; height: 18px; }
   .pen:hover { border-color: var(--blue); }
+  .pen:active { transform: scale(.92); }
+  .grid.live td:last-child { padding-top: 4px; padding-bottom: 4px; }
   .pform { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
   .pform label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
   .pform .wide { grid-column: 1 / 3; }
@@ -241,8 +277,9 @@
     .topbar { gap: 8px; padding: 0 10px; height: 48px; }
     .brand { font-size: 0; gap: 0; }               /* на узком экране остаётся только эмблема */
     .crumbs { font-size: 12.5px; }
-    .crumbs span:not(:last-child), .crumbs i { display: none; }
-    .vci { padding: 6px; } .vci span, .clock { display: none; }
+    .crumbs .crumb:not(:last-child), .crumbs i { display: none; }
+    .vci { padding: 6px 8px; font-size: 12px; gap: 6px; } .vci-long, .clock { display: none; } .vci-short { display: inline; }
+    .themebtn { width: 44px; }
     .vehicle { gap: 4px 14px; padding: 6px 12px; font-size: 12px; }
     .screen { padding: 12px; }
     .title { font-size: 16px; flex-wrap: wrap; gap: 2px 10px; }
@@ -250,17 +287,18 @@
     .tile { padding: 14px 8px 12px; }
     .tile .ic { width: 52px; height: 52px; border-radius: 12px; }
     .tile .ic svg { width: 28px; height: 28px; }
-    .tile .ds { font-size: 11px; }
+    .tile .ds { font-size: 12px; }
     .grid th, .grid td { padding: 9px 10px; }
     .bottombar { padding: 4px 2px calc(4px + env(safe-area-inset-bottom)); gap: 0; }
     .bottombar .sp { flex: 0; }
-    .bottombar button { flex: 1 1 0; min-width: 0; padding: 6px 2px; font-size: 10.5px; }
+    .bottombar button { flex: 1 1 0; min-width: 0; padding: 6px 2px; font-size: 12px; }
     .bottombar button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
     canvas { height: 170px; }
     .form { padding: 12px; }
     .gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .gauge { padding: 10px 10px 8px; border-radius: 12px; }
-    .g-name { font-size: 10.5px; }
+    .g-name { font-size: 12px; letter-spacing: .02em; }
+    .g-head { flex-wrap: wrap; }
     .g-big { margin: 14px 0 10px; } .g-big .g-val { font-size: 26px; } .g-big small { font-size: 12px; }
     .pform { grid-template-columns: 1fr; } .pform .wide { grid-column: auto; }
     .grid.live th:nth-child(3), .grid.live td:nth-child(3) { display: none; }
@@ -274,13 +312,20 @@
   .dlg .mtext { padding: 18px 16px; margin: 0; max-height: 70vh; overflow: auto; }
   .dlg { width: min(520px, 94vw) !important; }
   .dlg .btns { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px 16px; }
-  .dlg button { font: inherit; padding: 8px 18px; border-radius: 6px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+  .dlg button { font: inherit; padding: 8px 18px; min-height: 44px; min-width: 88px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--text); cursor: pointer; transition: transform .1s; }
+  .dlg button:active { transform: scale(.96); }
+  .dlg button.danger { color: var(--err); border-color: currentColor; }
+  .modal.show .dlg { animation: dlgIn .18s cubic-bezier(.2,.8,.2,1); }
+  @keyframes dlgIn { from { opacity: 0; transform: scale(.96) translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .modal.show .dlg { animation: none; } }
   .dlg button.pri { background: var(--blue); border-color: var(--blue); color: #fff; }
 </style>
 </head>
 <body>
 
-<div id="splash" title="Нажмите, чтобы пропустить">
+<a class="skip" href="#view">К содержимому</a>
+
+<div id="splash" title="Нажмите, чтобы пропустить" aria-hidden="true">
   <div class="sp-wrap">
     <div class="sp-emblem" id="spEmblem">
       <svg viewBox="0 0 200 200">
@@ -303,13 +348,14 @@
   <div class="sp-skip">нажмите, чтобы пропустить</div>
 </div>
 
-<div class="topbar">
-  <div class="brand"><div class="logo"></div>DS2 SCAN</div>
-  <div class="crumbs" id="crumbs"></div>
-  <div class="vci" id="vci"><div class="led"></div><span id="vciText">Адаптер не подключён</span></div>
-  <button class="themebtn" id="themeBtn" title="Тёмная / светлая тема"></button>
-  <div class="clock" id="clock"></div>
-</div>
+<header class="topbar">
+  <div class="brand"><div class="logo" aria-hidden="true"></div>DS2 SCAN</div>
+  <nav class="crumbs" id="crumbs" aria-label="Путь"></nav>
+  <div class="vci" id="vci" role="status"><div class="led" aria-hidden="true"></div><span id="vciText" class="vci-long">Адаптер не подключён</span><span id="vciShort" class="vci-short" aria-hidden="true">Нет связи</span></div>
+  <button class="themebtn" id="logBtn" type="button" aria-label="Журнал обмена" title="Журнал обмена"></button>
+  <button class="themebtn" id="themeBtn" type="button"></button>
+  <div class="clock" id="clock" aria-hidden="true"></div>
+</header>
 
 <div class="vehicle">
   <div>Автомобиль: <b>BMW E30 / E34</b></div>
@@ -317,11 +363,13 @@
   <div>Адаптер: <b id="vehAdapter">—</b></div>
 </div>
 
-<div class="screen"><div id="view"></div></div>
+<main class="screen"><div id="view" tabindex="-1"></div></main>
 
-<div class="bottombar" id="bottombar"></div>
+<nav class="bottombar" id="bottombar" aria-label="Действия"></nav>
 
-<div class="modal" id="modal"><div class="dlg">
+<div class="sr-only" id="announcer" aria-live="polite"></div>
+
+<div class="modal" id="modal"><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="mTitle" aria-describedby="mText">
   <h4 id="mTitle"></h4><div id="mText" class="mtext"></div>
   <div class="btns" id="mBtns"></div>
 </div></div>
@@ -460,6 +508,8 @@ function lookup(ecu, code) {
 }
 
 const ICON = {
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>',
+  alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
   gauge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3.5 17a9 9 0 1117 0"/><path d="M12 17l4.5-6"/><circle cx="12" cy="17" r="1.5"/></svg>',
   scan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
   ecu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4"/></svg>',
@@ -480,6 +530,9 @@ const ICON = {
   off: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.4 6.6a9 9 0 11-12.8 0M12 2v10"/></svg>',
   demo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
 };
+
+// Значки декоративные — рядом всегда есть текст, поэтому скрываем их от экранного диктора
+for (const k in ICON) ICON[k] = ICON[k].replace('<svg ', '<svg aria-hidden="true" focusable="false" ');
 
 // ===================== Утилиты =====================
 const $ = id => document.getElementById(id);
@@ -751,28 +804,57 @@ async function ensureEcu(p) {
 }
 
 // ===================== Навигация =====================
+// Экраны лежат в стеке. Каждый переход записывается в историю браузера,
+// поэтому системная кнопка «Назад» (Android, браузер) возвращает на предыдущий экран.
 const state = { stack: [], scan: {}, module: null, poll: null, gauges: [], raf: 0 };
+const OFFLINE_SCREENS = new Set(['dtcref', 'help', 'log']);   // открываются по ссылке и без подключения
+const hashFor = stack => '#/' + stack.slice(1).map(s => s.screen + (s.params.addr != null ? '-' + h1(s.params.addr).toLowerCase() : '')).join('/');
 function go(screen, params = {}, replace = false) {
   stopPoll();
   if (replace) state.stack.pop();
   state.stack.push({ screen, params });
-  render();
+  const st = { depth: state.stack.length - 1 };
+  try { replace ? history.replaceState(st, '', hashFor(state.stack)) : history.pushState(st, '', hashFor(state.stack)); } catch {}
+  render(true);
 }
-function back() { stopPoll(); if (state.stack.length > 1) { state.stack.pop(); render(); } }
-function home() { stopPoll(); state.stack = [state.stack[0]]; render(); }
+function back() { if (state.stack.length > 1) history.back(); }
+function home() { const n = state.stack.length - 1; if (n > 0) history.go(-n); }
 const cur = () => state.stack.at(-1);
+window.addEventListener('popstate', e => {
+  // «Назад» при открытом окне — просто закрыть окно
+  if (modalState.open) {
+    modalState.cancel();
+    try { history.pushState({ depth: state.stack.length - 1 }, '', hashFor(state.stack)); } catch {}
+    return;
+  }
+  const d = e.state?.depth ?? 0;
+  if (d < state.stack.length - 1) { stopPoll(); state.stack.length = Math.max(1, d + 1); render(true); }
+  else if (d > state.stack.length - 1) history.go(state.stack.length - 1 - d);   // «вперёд» не поддерживается
+});
 
-function render() {
+function render(moveFocus = false) {
   const { screen, params } = cur();
   state.gauges = [];
   // путь
-  $('crumbs').innerHTML = state.stack.map((s, i) => `<span data-i="${i}">${esc(SCREENS[s.screen].crumb(s.params))}</span>`).join('<i>›</i>');
-  $('crumbs').querySelectorAll('span').forEach(sp => sp.onclick = () => {
-    const i = +sp.dataset.i; if (i < state.stack.length - 1) { stopPoll(); state.stack.length = i + 1; render(); }
+  const crumbs = $('crumbs');
+  crumbs.innerHTML = '';
+  state.stack.forEach((s, i) => {
+    if (i) { const sep = document.createElement('i'); sep.textContent = '›'; sep.setAttribute('aria-hidden', 'true'); crumbs.appendChild(sep); }
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'crumb'; b.textContent = SCREENS[s.screen].crumb(s.params);
+    if (i === state.stack.length - 1) b.setAttribute('aria-current', 'page');
+    else b.onclick = () => history.go(i - (state.stack.length - 1));
+    crumbs.appendChild(b);
   });
-  $('view').innerHTML = '';
-  SCREENS[screen].draw($('view'), params);
+  const v = $('view');
+  v.innerHTML = '';
+  SCREENS[screen].draw(v, params);
+  const t = v.querySelector('.title');
+  if (t) { t.setAttribute('role', 'heading'); t.setAttribute('aria-level', '1'); }
   drawBar(SCREENS[screen].buttons ? SCREENS[screen].buttons(params) : []);
+  document.title = (screen === 'home' ? '' : SCREENS[screen].crumb(params) + ' · ') + 'BMW DS2 Диагностика';
+  $('logBtn').setAttribute('aria-pressed', String(screen === 'log'));
+  if (moveFocus) { document.querySelector('.screen').scrollTop = 0; v.focus({ preventScroll: true }); }
 }
 
 function drawBar(extra) {
@@ -780,11 +862,21 @@ function drawBar(extra) {
   bar.innerHTML = '';
   const add = (b) => {
     const el = document.createElement('button');
+    el.type = 'button';
     el.innerHTML = ICON[b.icon] + `<span>${b.label}</span>`;
     if (b.cls) el.className = b.cls;
     el.disabled = !!b.disabled;
-    el.onclick = b.onClick;
     if (b.id) el.id = b.id;
+    el.onclick = async () => {
+      const r = b.onClick();
+      // Пока команда выполняется, кнопка заблокирована и показывает индикатор
+      if (r && typeof r.then === 'function' && b.busy !== false) {
+        el.disabled = true; el.classList.add('busy'); el.setAttribute('aria-busy', 'true');
+        try { await r; } finally {
+          if (el.isConnected) { el.disabled = false; el.classList.remove('busy'); el.removeAttribute('aria-busy'); }
+        }
+      }
+    };
     bar.appendChild(el);
   };
   const deep = state.stack.length > 1;
@@ -792,28 +884,73 @@ function drawBar(extra) {
   add({ icon: 'home', label: 'Главная', onClick: home, disabled: !deep });
   const sp = document.createElement('div'); sp.className = 'sp'; bar.appendChild(sp);
   extra.forEach(add);
-  add({ icon: 'log', label: 'Журнал', onClick: () => go('log'), disabled: cur().screen === 'log' });
+  syncPollButtons();
 }
 
-function tile(icon, color, name, desc, onClick, disabled) {
-  const d = document.createElement('div');
-  d.className = 'tile' + (disabled ? ' disabled' : '');
-  d.innerHTML = `<div class="ic ${color}">${ICON[icon]}</div><div class="nm">${name}</div><div class="ds">${desc}</div>`;
-  d.onclick = onClick;
+function tile(icon, color, name, desc, onClick, needsConnection) {
+  const d = document.createElement('button');
+  d.type = 'button';
+  d.className = 'tile' + (needsConnection ? ' off' : '');
+  d.innerHTML = `<span class="ic ${color}">${ICON[icon]}</span><span class="nm">${name}</span><span class="ds">${desc}</span>`;
+  // Недоступная плитка не молчит, а объясняет, почему
+  if (needsConnection) { d.setAttribute('aria-disabled', 'true'); d.onclick = () => needConn(); }
+  else d.onclick = onClick;
   return d;
 }
+// Строка таблицы, которую можно нажать мышью, пальцем или клавишами Enter/пробел
+function clickable(el, fn, label) {
+  el.classList.add('click');
+  el.tabIndex = 0;
+  el.setAttribute('role', 'button');
+  if (label) el.setAttribute('aria-label', label);
+  el.onclick = fn;
+  el.onkeydown = e => { if (e.target === el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); fn(); } };
+}
 function h(html) { const t = document.createElement('div'); t.innerHTML = html.trim(); return t.firstElementChild; }
+function announce(msg) { const a = $('announcer'); a.textContent = ''; setTimeout(() => { a.textContent = msg; }, 60); }
 
+// Окно: закрывается Esc, кнопкой «Назад» и нажатием на затемнение; фокус не уходит за его пределы
+const modalState = { open: false, cancel: null };
 function modal(title, text, buttons) {
   return new Promise(resolve => {
+    const prev = document.activeElement;
+    const cancelVal = buttons[0][1];
+    let onKey;
+    const finish = val => {
+      if (!modalState.open) return;
+      modalState.open = false;
+      $('modal').classList.remove('show');
+      document.removeEventListener('keydown', onKey, true);
+      if (prev && prev.isConnected && !$('modal').contains(prev)) prev.focus({ preventScroll: true });
+      resolve(val);
+    };
     $('mTitle').textContent = title; $('mText').innerHTML = text;
     $('mBtns').innerHTML = '';
+    let primary = null;
     buttons.forEach(([label, val, pri]) => {
-      const b = document.createElement('button'); b.textContent = label; if (pri) b.className = 'pri';
-      b.onclick = () => { $('modal').classList.remove('show'); resolve(val); };
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = label;
+      if (pri) { b.className = 'pri'; primary = b; }
+      if (val === 'del') b.className = 'danger';
+      b.onclick = () => finish(val);
       $('mBtns').appendChild(b);
     });
+    onKey = e => {
+      if (e.key === 'Escape') { e.preventDefault(); finish(cancelVal); }
+      else if (e.key === 'Tab') {
+        const f = [...$('modal').querySelectorAll('button, input, select, textarea')].filter(x => !x.disabled);
+        if (!f.length) return;
+        if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f.at(-1).focus(); }
+        else if (!e.shiftKey && document.activeElement === f.at(-1)) { e.preventDefault(); f[0].focus(); }
+      }
+    };
+    document.addEventListener('keydown', onKey, true);
+    $('modal').onclick = e => { if (e.target === $('modal')) finish(cancelVal); };
+    modalState.open = true;
+    modalState.cancel = () => finish(cancelVal);
     $('modal').classList.add('show');
+    const firstField = $('mText').querySelector('input, select');
+    (firstField || primary || $('mBtns').querySelector('button')).focus({ preventScroll: true });
   });
 }
 const needConn = () => { if (!transport) { modal('Нет связи', 'Сначала подключите адаптер или включите демо-режим.', [['OK', 0, 1]]); return true; } return false; };
@@ -823,6 +960,7 @@ function setVci(m) {
   mode = m;
   $('vci').className = 'vci' + (m === 'demo' ? ' demo' : m ? ' on' : '');
   $('vciText').textContent = m === 'demo' ? 'Демо-режим' : m ? 'Адаптер подключён' : 'Адаптер не подключён';
+  $('vciShort').textContent = m === 'demo' ? 'Демо' : m ? 'Связь' : 'Нет связи';
   $('vehAdapter').textContent = m === 'demo' ? 'демо (данные выдуманы)' : m ? transport.label : '—';
 }
 async function connect(kind) {
@@ -832,6 +970,7 @@ async function connect(kind) {
     setVci(kind);
     log('inf', kind === 'demo' ? 'Демо-режим: ответы генерируются, машина не нужна.'
       : kind === 'usb' ? 'Кабель FTDI настроен через WebUSB: 9600 бод, 8E1.' : 'Порт открыт: 9600 бод, 8E1.');
+    announce(kind === 'demo' ? 'Включён демо-режим' : 'Адаптер подключён');
   } catch (e) {
     try { await transport?.close(); } catch {}
     transport = null;
@@ -839,7 +978,11 @@ async function connect(kind) {
   }
   render();
 }
-async function disconnect() { stopPoll(); await transport?.close(); transport = null; setVci(null); state.scan = {}; log('inf', 'Отключено.'); home(); }
+async function disconnect() {
+  stopPoll(); await transport?.close(); transport = null; setVci(null); state.scan = {};
+  log('inf', 'Отключено.'); announce('Адаптер отключён');
+  if (state.stack.length > 1) home(); else render();
+}
 
 // ===================== Экраны =====================
 const SCREENS = {
@@ -880,8 +1023,8 @@ const SCREENS = {
       for (const m of MODULES) {
         const st = state.scan[m.addr];
         const badge = st === true ? '<span class="badge b-ok">Найден</span>' : st === false ? '<span class="badge b-err">Нет ответа</span>' : '<span class="badge b-wait">Не проверен</span>';
-        const tr = h(`<table><tr class="click"><td class="mono">${h1(m.addr)}</td><td>${m.name}</td><td>${badge}</td></tr></table>`).querySelector('tr');
-        tr.onclick = () => go('module', { addr: m.addr });
+        const tr = h(`<table><tr><td class="mono">${h1(m.addr)}</td><td>${m.name}</td><td>${badge}</td></tr></table>`).querySelector('tr');
+        clickable(tr, () => go('module', { addr: m.addr }), m.name);
         tb.appendChild(tr);
       }
       v.appendChild(card);
@@ -893,7 +1036,7 @@ const SCREENS = {
   autoscan: {
     crumb: () => 'Автоскан',
     draw(v, p) {
-      v.appendChild(h('<div class="title">Автоскан <small id="scanState">опрос блоков…</small></div>'));
+      v.appendChild(h('<div class="title">Автоскан <small id="scanState" role="status">опрос блоков…</small></div>'));
       v.appendChild(h('<div class="progress"><div id="scanBar"></div></div>'));
       const card = h(`<div class="card"><table class="grid"><thead><tr><th style="width:70px">Адрес</th><th>Система</th><th style="width:130px">Статус</th><th style="width:150px">Ошибки</th></tr></thead><tbody id="scanBody"></tbody></table></div>`);
       v.appendChild(card);
@@ -902,9 +1045,15 @@ const SCREENS = {
         const tr = h(`<table><tr><td class="mono">${h1(m.addr)}</td><td>${m.name}</td><td><span class="badge b-wait">Ожидание</span></td><td></td></tr></table>`).querySelector('tr');
         rows[m.addr] = tr; card.querySelector('tbody').appendChild(tr);
       }
-      if (p.start) { p.start = false; runScan(rows); }
-      else if (p.results) fillScan(rows, p.results);
+      if (p.start) { p.start = false; runScan(rows, p); }
+      else if (p.results) {
+        fillScan(rows, p.results);
+        const n = Object.keys(p.results).length;
+        $('scanBar').style.transform = `scaleX(${n / MODULES.length})`;
+        $('scanState').textContent = p.done ? p.summary : `прерван: опрошено ${n} из ${MODULES.length}`;
+      }
     },
+    buttons: () => [{ icon: 'refresh', label: 'Повторить', onClick: () => go('autoscan', { start: true }, true) }],
   },
 
   module: {
@@ -943,7 +1092,7 @@ const SCREENS = {
     crumb: () => 'Поток данных',
     draw(v, p) {
       p.sel ??= 0; p.hist ??= {};
-      v.appendChild(h('<div class="title">Поток данных <small id="liveState">остановлен</small></div>'));
+      v.appendChild(h('<div class="title">Поток данных <small id="liveState" role="status">остановлен</small></div>'));
       const box = h(`<div class="split">
         <div class="card"><table class="grid live"><thead><tr><th style="width:50px">Байт</th><th style="width:56px">HEX</th><th style="width:56px">DEC</th><th>Параметр</th><th style="width:44px"></th></tr></thead><tbody id="liveBody"><tr><td colspan="5" class="empty">Нажмите «Старт»</td></tr></tbody></table></div>
         <div class="card"><div class="graph-head" id="graphHead">График байта</div><canvas id="graph"></canvas></div>
@@ -955,7 +1104,7 @@ const SCREENS = {
       startPoll(p, liveFeed(p));
     },
     buttons: p => [
-      { icon: 'play', label: 'Старт', id: 'bStart', cls: 'act', onClick: () => startPoll(p, liveFeed(p)) },
+      { icon: 'play', label: 'Старт', id: 'bStart', cls: 'act', busy: false, onClick: () => startPoll(p, liveFeed(p)) },
       { icon: 'pause', label: 'Стоп', id: 'bStop', onClick: stopPoll },
       { icon: 'gauge', label: 'Приборы', onClick: () => switchTo('dash', p) },
     ],
@@ -964,7 +1113,7 @@ const SCREENS = {
   dash: {
     crumb: () => 'Приборы',
     draw(v, p) {
-      v.appendChild(h('<div class="title">Приборы <small id="liveState">подготовка…</small></div>'));
+      v.appendChild(h('<div class="title">Приборы <small id="liveState" role="status">подготовка…</small></div>'));
       const grid = h('<div class="gauges"></div>');
       v.appendChild(grid);
       const tools = h(`<div class="dash-tools">
@@ -993,8 +1142,8 @@ const SCREENS = {
       });
     },
     buttons: p => [
-      { icon: 'play', label: 'Старт', cls: 'act', onClick: () => state.gauges.length && startPoll(p, dashFeed(p)) },
-      { icon: 'pause', label: 'Стоп', onClick: stopPoll },
+      { icon: 'play', label: 'Старт', id: 'bStart', cls: 'act', busy: false, onClick: () => state.gauges.length && startPoll(p, dashFeed(p)) },
+      { icon: 'pause', label: 'Стоп', id: 'bStop', onClick: stopPoll },
       { icon: 'live', label: 'Поток', onClick: () => switchTo('live', p) },
     ],
   },
@@ -1201,21 +1350,27 @@ async function assignCode(ecu, code, done) {
 }
 
 async function clearFaults(addr) {
-  const m = MODULES.find(x => x.addr === addr);
-  const ok = await modal('Стирание кодов', `Стереть память неисправностей в блоке <b>${m.short}</b>?<br><br>Двигатель должен быть заглушен, зажигание включено.`, [['Отмена', false], ['Стереть', true, 1]]);
-  if (!ok) return;
+  if (state.clearing) return;      // защита от повторного нажатия
+  state.clearing = true;
   try {
-    const r = await cmd(addr, [0x05]);
-    await modal('Стирание кодов', r.code === 0xA0 ? 'Память неисправностей очищена. Прочитайте коды ещё раз, чтобы проверить.' : 'Блок ответил: ' + esc(r.status), [['OK', 0, 1]]);
-  } catch (e) { await modal('Стирание кодов', esc(errText(e)), [['OK', 0, 1]]); }
-  if (cur().screen === 'faults') go('faults', cur().params, true);
+    const m = MODULES.find(x => x.addr === addr);
+    const ok = await modal('Стирание кодов', `Стереть память неисправностей в блоке <b>${m.short}</b>?<br><br>Двигатель должен быть заглушен, зажигание включено.`, [['Отмена', false], ['Стереть', true, 1]]);
+    if (!ok) return;
+    try {
+      const r = await cmd(addr, [0x05]);
+      if (r.code === 0xA0) announce('Память неисправностей очищена');
+      await modal('Стирание кодов', r.code === 0xA0 ? 'Память неисправностей очищена. Прочитайте коды ещё раз, чтобы проверить.' : 'Блок ответил: ' + esc(r.status), [['OK', 0, 1]]);
+    } catch (e) { await modal('Стирание кодов', esc(errText(e)) + '<br><br>Проверьте подключение и попробуйте ещё раз.', [['OK', 0, 1]]); }
+    if (cur().screen === 'faults') go('faults', cur().params, true);
+  } finally { state.clearing = false; }
 }
 
-async function runScan(rows) {
-  const results = {};
+async function runScan(rows, p) {
+  const results = p.results = {};
   let i = 0;
   for (const m of MODULES) {
-    if (cur().screen !== 'autoscan') return;
+    // Опрос принадлежит своему экрану: ушли с него или запустили заново — этот цикл останавливается
+    if (cur().params !== p) return;
     rows[m.addr].cells[2].innerHTML = '<span class="badge b-run">Опрос…</span>';
     try {
       await cmd(m.addr, [0x00], 600);
@@ -1226,13 +1381,16 @@ async function runScan(rows) {
       } catch { results[m.addr].faults = '?'; }
     } catch { results[m.addr] = { ok: false }; }
     state.scan[m.addr] = results[m.addr].ok;
+    if (cur().params !== p) return;
     fillScan(rows, results);
-    $('scanBar').style.width = (++i / MODULES.length * 100) + '%';
+    $('scanBar').style.transform = `scaleX(${++i / MODULES.length})`;
   }
   const found = Object.values(results).filter(r => r.ok).length;
   const withF = Object.values(results).filter(r => r.faults === 'есть').length;
-  $('scanState').textContent = `завершён: найдено блоков ${found}, с ошибками ${withF}`;
-  cur().params.results = results;
+  p.done = true;
+  p.summary = `завершён: найдено блоков ${found}, с ошибками ${withF}`;
+  $('scanState').textContent = p.summary;
+  announce(`Автоскан ${p.summary}`);
   log('inf', `Автоскан: найдено ${found} из ${MODULES.length}.`);
 }
 function fillScan(rows, results) {
@@ -1240,7 +1398,7 @@ function fillScan(rows, results) {
     const tr = rows[addr];
     tr.cells[2].innerHTML = r.ok ? '<span class="badge b-ok">Найден</span>' : '<span class="badge b-err">Нет ответа</span>';
     tr.cells[3].innerHTML = !r.ok ? '' : r.faults === 'есть' ? '<span class="badge b-warn">Есть ошибки</span>' : r.faults === 'нет' ? '<span class="badge b-ok">Нет ошибок</span>' : '<span class="badge b-wait">—</span>';
-    if (r.ok) { tr.className = 'click'; tr.onclick = () => go('module', { addr: +addr }); }
+    if (r.ok && !tr.classList.contains('click')) clickable(tr, () => go('module', { addr: +addr }), MODULES.find(m => m.addr === +addr).name);
   }
 }
 
@@ -1248,11 +1406,19 @@ function fillScan(rows, results) {
 function stopPoll() {
   if (state.poll) { state.poll.stop = true; state.poll = null; }
   const s = $('liveState'); if (s) s.textContent = 'остановлен';
+  syncPollButtons();
+}
+// «Старт» недоступен, пока идёт опрос; «Стоп» — пока опроса нет
+function syncPollButtons() {
+  const a = $('bStart'), b = $('bStop');
+  if (a) a.disabled = !!state.poll;
+  if (b) b.disabled = !state.poll;
 }
 const setLiveState = t => { const s = $('liveState'); if (s) s.textContent = t; };
 async function startPoll(p, onData) {
   if (state.poll) return;
   const job = { stop: false }; state.poll = job;
+  syncPollButtons();
   setLiveState('идёт опрос…');
   await ensureEcu(p);
   while (!job.stop) {
@@ -1283,9 +1449,8 @@ function drawLive(p, d, record = true) {
     tb.innerHTML = '';
     d.forEach((_, i) => {
       const tr = document.createElement('tr');
-      tr.className = 'click';
-      tr.innerHTML = `<td class="mono">${i}</td><td class="mono"></td><td class="mono"></td><td class="pc"></td><td><button class="pen" title="Подписать значение">✎</button></td>`;
-      tr.onclick = () => { p.sel = i; drawLive(p, p.last, false); };
+      tr.innerHTML = `<td class="mono">${i}</td><td class="mono"></td><td class="mono"></td><td class="pc"></td><td><button class="pen" type="button" title="Подписать значение" aria-label="Подписать байт ${i}">${ICON.edit}</button></td>`;
+      clickable(tr, () => { p.sel = i; drawLive(p, p.last, false); }, `Байт ${i}: показать график`);
       tr.querySelector('.pen').onclick = e => { e.stopPropagation(); editParam(p, i); };
       tb.appendChild(tr);
     });
@@ -1299,7 +1464,7 @@ function drawLive(p, d, record = true) {
     const q = params.find(x => x.off === i);
     let html;
     if (q) { const r = evalParam(q, d); html = `<b>${esc(q.name)}</b> <span class="mono pv">${fmt(r?.v, q.dec)} ${esc(q.unit)}</span>`; }
-    else if (params.some(x => x.len === 2 && x.off === i - 1)) html = '<span class="pc-none">↑ вторая часть значения</span>';
+    else if (params.some(x => x.len === 2 && x.off === i - 1)) html = `<span class="pc-none">часть значения байта ${i - 1}</span>`;
     else html = '<span class="pc-none">—</span>';
     if (tr.cells[3].innerHTML !== html) tr.cells[3].innerHTML = html;
   });
@@ -1409,7 +1574,11 @@ class Gauge {
     const el = this.el = document.createElement('div');
     el.className = 'gauge gt-' + q.type;
     el.style.setProperty('--i', i);
+    el.setAttribute('role', 'group');
+    el.setAttribute('aria-label', q.name + (q.unit ? ', ' + q.unit : ''));
     const warnF = q.warn != null && q.warn < q.max ? clamp01((q.warn - q.min) / this.span) : null;
+    // Превышение показывается не только цветом, но и значком с текстом
+    const head = `<div class="g-head"><div class="g-name">${esc(q.name)}</div><span class="g-alert"><span class="ico">${ICON.alert}</span>выше нормы</span></div>`;
     if (q.type === 'dial') {
       const id = 'gg' + (++gaugeId);
       this.L = Math.PI * 2 * GR * ARC / 360;
@@ -1423,8 +1592,8 @@ class Gauge {
         const [x, y] = polar(ARC0 + ARC * k / 4, GR - 33);
         labels += `<text x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" class="g-lbl">${shortNum(q.min + this.span * k / 4)}</text>`;
       }
-      el.innerHTML = `<div class="g-name">${esc(q.name)}</div>
-        <svg viewBox="0 0 200 168" class="g-svg">
+      el.innerHTML = `${head}
+        <svg viewBox="0 0 200 168" class="g-svg" aria-hidden="true">
           <defs><linearGradient id="${id}" x1="0" x2="1" y1="0" y2="0"><stop offset="0" style="stop-color:var(--blue)"/><stop offset="1" style="stop-color:#6fd3ff"/></linearGradient></defs>
           <path d="${arcPath(ARC0, ARC0 + ARC)}" class="g-track"/>
           ${warnF != null ? `<path d="${arcPath(ARC0 + ARC * warnF, ARC0 + ARC, GR + 9)}" class="g-warnzone"/>` : ''}
@@ -1437,13 +1606,16 @@ class Gauge {
       this.arc = el.querySelector('.g-arc');
       this.needle = el.querySelector('.g-needle');
     } else {
-      el.innerHTML = `<div class="g-name">${esc(q.name)}</div>
+      el.innerHTML = `${head}
         <div class="g-big"><span class="g-val">—</span><small>${esc(q.unit)}</small></div>
-        <div class="g-bar"><div class="g-fill"></div>${warnF != null ? `<i class="g-mark" style="left:${(warnF * 100).toFixed(1)}%"></i>` : ''}</div>
+        <div class="g-bar" aria-hidden="true"><div class="g-fill"></div>${warnF != null ? `<i class="g-mark" style="left:${(warnF * 100).toFixed(1)}%"></i>` : ''}</div>
         <div class="g-range"><span>${fmt(q.min, q.dec)}</span><span>${fmt(q.max, q.dec)}</span></div>`;
       this.fill = el.querySelector('.g-fill');
     }
     this.val = el.querySelector('.g-val');
+    // Текст для экранного диктора (сама шкала скрыта от него как картинка)
+    el.insertAdjacentHTML('beforeend', '<span class="sr-only g-sr"></span>');
+    this.sr = el.querySelector('.g-sr');
     this.render();
   }
   set(v) { if (v == null) return; this.target = v; this.has = true; }
@@ -1462,12 +1634,15 @@ class Gauge {
     const warn = this.has && this.p.warn != null && this.cur >= this.p.warn;
     this.el.classList.toggle('warn', warn);
     const txt = showValue ? fmt(this.cur, this.p.dec) : '—';
-    if (this.val.textContent !== txt) this.val.textContent = txt;
+    if (this.val.textContent !== txt) {
+      this.val.textContent = txt;
+      this.sr.textContent = `${txt} ${this.p.unit}${warn ? ', выше нормы' : ''}`;
+    }
     if (this.p.type === 'dial') {
       this.arc.style.strokeDashoffset = (this.L * (1 - f)).toFixed(2);
       this.needle.setAttribute('transform', `rotate(${(ARC0 + ARC * f).toFixed(2)} 100 100)`);
     } else {
-      this.fill.style.width = (f * 100).toFixed(2) + '%';
+      this.fill.style.transform = `scaleX(${f.toFixed(4)})`;
     }
   }
 }
@@ -1540,8 +1715,9 @@ const MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
 function savedTheme() { try { return localStorage.getItem(THEME_KEY); } catch { return null; } }
 function applyTheme(t) {
   document.documentElement.dataset.theme = t;
-  $('themeBtn').innerHTML = t === 'dark' ? SUN : MOON;
+  $('themeBtn').innerHTML = (t === 'dark' ? SUN : MOON).replace('<svg ', '<svg aria-hidden="true" focusable="false" ');
   $('themeBtn').title = t === 'dark' ? 'Светлая тема' : 'Тёмная тема';
+  $('themeBtn').setAttribute('aria-label', t === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему');
   if (cur()?.screen === 'live') drawGraph(cur().params);
 }
 $('themeBtn').onclick = () => {
@@ -1560,10 +1736,19 @@ sysDark.addEventListener('change', e => { if (!savedTheme()) applyTheme(e.matche
   img.onload = () => { $('spEmblem').innerHTML = ''; $('spEmblem').appendChild(img); };
   img.alt = '';
   img.src = 'logo.png';
-  const close = () => { sp.classList.add('hide'); setTimeout(() => sp.remove(), 700); };
+  // Заставка показывается один раз за сеанс: при обновлении страницы она не мешает
+  let seen = false;
+  try { seen = sessionStorage.getItem('ds2-splash') === '1'; sessionStorage.setItem('ds2-splash', '1'); } catch {}
+  if (seen) { sp.remove(); return; }
+  let closed = false;
+  const close = () => {
+    if (closed) return; closed = true;
+    sp.classList.add('hide'); setTimeout(() => sp.remove(), 450);
+    document.removeEventListener('keydown', close);
+  };
   sp.onclick = close;
-  document.addEventListener('keydown', close, { once: true });
-  setTimeout(close, matchMedia('(prefers-reduced-motion: reduce)').matches ? 600 : 2900);
+  document.addEventListener('keydown', close);
+  setTimeout(close, matchMedia('(prefers-reduced-motion: reduce)').matches ? 400 : 2300);
 })();
 
 // ===================== Старт =====================
@@ -1571,8 +1756,17 @@ applyTheme(savedTheme() || (sysDark.matches ? 'dark' : 'light'));
 setInterval(() => $('clock').textContent = new Date().toLocaleTimeString().slice(0, 5), 1000);
 $('clock').textContent = new Date().toLocaleTimeString().slice(0, 5);
 setVci(null);
-state.stack = [{ screen: 'home', params: {} }];
-render();
+$('logBtn').innerHTML = ICON.log;
+$('logBtn').onclick = () => { if (cur().screen !== 'log') go('log'); };
+document.querySelector('.skip').onclick = e => { e.preventDefault(); $('view').focus(); };
+// Старт: главная + (если в адресе экран, которому не нужно подключение) этот экран
+(function initRoute() {
+  const first = location.hash.replace(/^#\/?/, '').split('/')[0].split('-')[0];
+  try { history.replaceState({ depth: 0 }, '', '#/'); } catch {}
+  state.stack = [{ screen: 'home', params: {} }];
+  render();
+  if (OFFLINE_SCREENS.has(first)) go(first);
+})();
 </script>
 </body>
 </html>
