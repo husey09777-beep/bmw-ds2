@@ -81,7 +81,7 @@
   .graph-head { padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
   .graph-head b { color: var(--text); font-size: 20px; font-family: var(--mono); margin-left: 6px; }
 
-  input.field { font: inherit; font-family: var(--mono); padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px; background: #fff; }
+  input.field, select.field { font: inherit; font-family: var(--mono); padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--text); }
   label.lbl { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
   .form { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; padding: 14px; }
 
@@ -138,7 +138,7 @@
   :root[data-theme="dark"] .hint { background: rgba(242,169,59,.09); border-color: rgba(242,169,59,.3); color: #f0c675; }
   :root[data-theme="dark"] .hint.info { background: rgba(59,142,240,.09); border-color: rgba(59,142,240,.3); color: #9cc7f7; }
   :root[data-theme="dark"] .hint.bad { background: rgba(255,107,101,.09); border-color: rgba(255,107,101,.3); color: #ffa29d; }
-  :root[data-theme="dark"] input.field, :root[data-theme="dark"] .search { background: #0e131a; color: var(--text); border-color: var(--line); }
+  :root[data-theme="dark"] input.field, :root[data-theme="dark"] select.field, :root[data-theme="dark"] .search { background: #0e131a; color: var(--text); border-color: var(--line); }
   :root[data-theme="dark"] .dlg { background: var(--card); color: var(--text); }
   :root[data-theme="dark"] .dlg button { background: #232c38; color: var(--text); border-color: var(--line); }
   :root[data-theme="dark"] .dlg button.pri { background: var(--blue); border-color: var(--blue); color: #fff; }
@@ -187,6 +187,54 @@
   .bottombar button.red { color: #ff9c97; }
   .bottombar .sp { flex: 1; }
 
+  /* ===== Приборы ===== */
+  .gauges { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+  .gauge { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px 10px;
+           animation: gIn .6s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i) * 80ms); }
+  .g-name { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .g-svg { display: block; width: 100%; max-width: 260px; margin: 2px auto 0; overflow: visible; }
+  .g-track { fill: none; stroke: var(--line); stroke-width: 10; stroke-linecap: round; }
+  .g-arc { fill: none; stroke-width: 10; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(22,119,210,.45)); }
+  .g-warnzone { fill: none; stroke: var(--err); stroke-width: 3; opacity: .75; stroke-linecap: round; }
+  .g-tick { stroke: var(--muted); stroke-width: 1.2; opacity: .55; } .g-tick.maj { stroke-width: 2.2; opacity: .9; }
+  .g-lbl { fill: var(--muted); font: 9px var(--mono); text-anchor: middle; }
+  .g-needle line { stroke: var(--err); stroke-width: 3.2; stroke-linecap: round; }
+  .g-needle circle { fill: var(--text); } .g-needle .g-cap { fill: var(--err); }
+  .g-needle { filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
+  .g-svg .g-val { fill: var(--text); font: 700 25px var(--mono); text-anchor: middle; }
+  .g-unit { fill: var(--muted); font-size: 11px; text-anchor: middle; }
+  .g-big { display: flex; align-items: baseline; gap: 8px; margin: 18px 0 12px; }
+  .g-big .g-val { font: 700 38px/1 var(--mono); letter-spacing: -.02em; transition: color .3s; }
+  .g-big small { font-size: 14px; color: var(--muted); }
+  .g-bar { position: relative; height: 12px; background: var(--line); border-radius: 6px; overflow: hidden; }
+  .gt-number .g-bar { height: 4px; }
+  .g-fill { height: 100%; width: 0; border-radius: 6px; background: linear-gradient(90deg, var(--blue), #6fd3ff); box-shadow: 0 0 10px rgba(22,119,210,.5); }
+  .g-mark { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--err); }
+  .g-range { display: flex; justify-content: space-between; font: 11px var(--mono); color: var(--muted); margin-top: 6px; }
+  .gauge.warn { border-color: rgba(217,58,53,.6); }
+  .gauge.warn::after { content: ''; position: absolute; inset: -1px; border-radius: 14px; border: 2px solid var(--err); pointer-events: none; animation: gPulse 1.1s ease-in-out infinite; }
+  .gauge.warn .g-big .g-val { color: var(--err); }
+  .gauge.warn .g-svg .g-val { fill: var(--err); }
+  .gauge.warn .g-fill { background: linear-gradient(90deg, #f39b1f, var(--err)); box-shadow: 0 0 10px rgba(217,58,53,.5); }
+  @keyframes gIn { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
+  @keyframes gPulse { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .gauge, .gauge.warn::after { animation: none; } }
+  .dash-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .lnk { font: inherit; font-size: 13px; color: var(--blue); background: var(--card); border: 1px solid var(--line); border-radius: 7px; padding: 7px 12px; cursor: pointer; }
+  .lnk:hover { border-color: var(--blue); }
+
+  /* Таблица потока данных и форма подписи */
+  .grid.live td { padding-top: 8px; padding-bottom: 8px; }
+  .pc b { font-weight: 600; } .pv { color: var(--blue); margin-left: 6px; white-space: nowrap; }
+  .pc-none { color: var(--muted); font-size: 12px; }
+  .pen { font: inherit; width: 32px; height: 30px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--blue); cursor: pointer; }
+  .pen:hover { border-color: var(--blue); }
+  .pform { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+  .pform label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+  .pform .wide { grid-column: 1 / 3; }
+  .pform .field { width: 100%; font-family: inherit; color: var(--text); }
+  .pf-prev { background: var(--bg); border-radius: 7px; padding: 9px 11px; font-size: 13px; color: var(--text); }
+
   /* ===== Телефон ===== */
   @media (max-width: 600px) {
     body { font-size: 14px; }
@@ -210,6 +258,12 @@
     .bottombar button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
     canvas { height: 170px; }
     .form { padding: 12px; }
+    .gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .gauge { padding: 10px 10px 8px; border-radius: 12px; }
+    .g-name { font-size: 10.5px; }
+    .g-big { margin: 14px 0 10px; } .g-big .g-val { font-size: 26px; } .g-big small { font-size: 12px; }
+    .pform { grid-template-columns: 1fr; } .pform .wide { grid-column: auto; }
+    .grid.live th:nth-child(3), .grid.live td:nth-child(3) { display: none; }
   }
 
   /* Модальное окно */
@@ -217,7 +271,8 @@
   .modal.show { display: grid; }
   .dlg { background: #fff; border-radius: 10px; width: min(440px, 92vw); overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
   .dlg h4 { margin: 0; padding: 12px 16px; background: var(--bar); color: #fff; font-size: 15px; }
-  .dlg p { padding: 18px 16px; margin: 0; }
+  .dlg .mtext { padding: 18px 16px; margin: 0; max-height: 70vh; overflow: auto; }
+  .dlg { width: min(520px, 94vw) !important; }
   .dlg .btns { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px 16px; }
   .dlg button { font: inherit; padding: 8px 18px; border-radius: 6px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
   .dlg button.pri { background: var(--blue); border-color: var(--blue); color: #fff; }
@@ -267,7 +322,7 @@
 <div class="bottombar" id="bottombar"></div>
 
 <div class="modal" id="modal"><div class="dlg">
-  <h4 id="mTitle"></h4><p id="mText"></p>
+  <h4 id="mTitle"></h4><div id="mText" class="mtext"></div>
   <div class="btns" id="mBtns"></div>
 </div></div>
 
@@ -405,6 +460,7 @@ function lookup(ecu, code) {
 }
 
 const ICON = {
+  gauge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3.5 17a9 9 0 1117 0"/><path d="M12 17l4.5-6"/><circle cx="12" cy="17" r="1.5"/></svg>',
   scan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
   ecu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4"/></svg>',
   term: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 9l3 3-3 3M12 15h6"/></svg>',
@@ -592,8 +648,14 @@ class DemoTransport {
     if (cmd === 0x04) return reply(addr === 0x12 ? [0xA0, 0x02, 0x1F, 0x03, 0x00, 0x2A, 0x01, 0x00] : [0xA0, 0x00]);
     if (cmd === 0x05) return reply([0xA0]);
     if (cmd === 0x0B && sub === 0x03) {
-      const t = Date.now() / 900, rpm = 800 + Math.round(Math.sin(t) * 60 + Math.random() * 20);
-      return reply([0xA0, rpm >> 8, rpm & 0xFF, 0x5A + Math.round(Math.sin(t / 3) * 4), 0x3C, 0x80 + Math.round(Math.random() * 4), 0x12, 0x00, 0x7F]);
+      // Имитация: периодические «перегазовки», прогрев двигателя, бортсеть ~14 В
+      this.t0 ??= Date.now();
+      const t = (Date.now() - this.t0) / 1000;
+      const thr = Math.max(0, Math.sin(t / 1.6)) ** 3;
+      const rpm = Math.round(780 + thr * 5600 + Math.random() * 30);
+      const temp = Math.round(Math.min(90, 45 + t * 1.5)) + 2;
+      return reply([0xA0, rpm >> 8, rpm & 0xFF, temp, Math.round(thr * 250),
+        138 + Math.round(Math.random() * 3), Math.round(25 + thr * 60), 0x00, 0x7F]);
     }
     return reply([0xFF]);
   }
@@ -623,8 +685,73 @@ async function cmd(addr, data, timeout) {
 }
 const errText = e => e.message === 'timeout' ? 'Блок не ответил. Проверьте зажигание, переходник и перемычку 7–8.' : e.message;
 
+// ===================== Подписи значений потока данных =====================
+// Для каждого блока (по номеру детали) хранится список: какой байт что означает и как пересчитать.
+const PARAMS_KEY = 'ds2-params';
+const DEMO_PARAMS = [
+  { name: 'Обороты двигателя', off: 0, len: 2, f: 'x', unit: 'об/мин', min: 0, max: 7000, warn: 6000, dec: 0, type: 'dial' },
+  { name: 'Температура ОЖ', off: 2, len: 1, f: 'x-2', unit: '°C', min: 0, max: 130, warn: 110, dec: 0, type: 'dial' },
+  { name: 'Дроссельная заслонка', off: 3, len: 1, f: 'x*0.4', unit: '%', min: 0, max: 100, warn: null, dec: 0, type: 'bar' },
+  { name: 'Напряжение бортсети', off: 4, len: 1, f: 'x*0.1', unit: 'В', min: 10, max: 16, warn: 15, dec: 1, type: 'number' },
+  { name: 'Время впрыска', off: 5, len: 1, f: 'x*0.1', unit: 'мс', min: 0, max: 10, warn: null, dec: 1, type: 'dial' },
+];
+const FORMULA_RE = /^[\dx+\-*/().\s]+$/;
+function compileFormula(f) {
+  if (!FORMULA_RE.test(f)) throw new Error('В формуле можно использовать только x, цифры, + − * / ( ) и точку');
+  const fn = new Function('x', 'return (' + f + ')');
+  if (!Number.isFinite(fn(1))) throw new Error('Формула не даёт число');
+  return fn;
+}
+const fnCache = new Map();
+function evalParam(q, d) {
+  if (!d || q.off + q.len > d.length) return null;
+  const raw = q.len === 2 ? (d[q.off] << 8 | d[q.off + 1]) : d[q.off];
+  let fn = fnCache.get(q.f);
+  if (!fn) { try { fn = compileFormula(q.f); } catch { fn = () => NaN; } fnCache.set(q.f, fn); }
+  const v = fn(raw);
+  return { raw, v: Number.isFinite(v) ? v : null };
+}
+const fmt = (v, dec = 0) => v == null || !Number.isFinite(v) ? '—'
+  : v.toLocaleString('ru-RU', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+const clamp01 = x => Math.max(0, Math.min(1, x));
+
+function sanitizeParam(q) {
+  if (!q || typeof q !== 'object') return null;
+  const f = String(q.f ?? 'x').trim() || 'x';
+  if (!FORMULA_RE.test(f)) return null;
+  const num = (v, d) => (v === '' || v == null || !Number.isFinite(+v)) ? d : +v;
+  const min = num(q.min, 0), max = num(q.max, 100);
+  return {
+    name: String(q.name ?? '').trim().slice(0, 40),
+    off: Math.max(0, Math.min(255, Math.trunc(num(q.off, 0)))),
+    len: +q.len === 2 ? 2 : 1, f,
+    unit: String(q.unit ?? '').trim().slice(0, 12),
+    min, max: max > min ? max : min + 1,
+    warn: num(q.warn, null),
+    dec: Math.max(0, Math.min(3, Math.trunc(num(q.dec, 0)))),
+    type: ['dial', 'bar', 'number'].includes(q.type) ? q.type : 'dial',
+  };
+}
+function loadParams() { try { return JSON.parse(localStorage.getItem(PARAMS_KEY)) || {}; } catch { return {}; } }
+function saveParams(m) { try { localStorage.setItem(PARAMS_KEY, JSON.stringify(m)); } catch {} }
+function getParams(ecu) {
+  const m = loadParams();
+  if (Array.isArray(m[ecu])) return m[ecu].map(sanitizeParam).filter(Boolean);
+  return ecu === 'demo' ? DEMO_PARAMS.map(x => ({ ...x })) : [];
+}
+function setParams(ecu, list) { const m = loadParams(); m[ecu] = list; saveParams(m); }
+
+// Номер детали блока — ключ, под которым хранятся подписи и привязки кодов
+async function ensureEcu(p) {
+  if (p.ecu) return p.ecu;
+  if (mode === 'demo') return (p.ecu = 'demo');
+  let part = null;
+  try { const id = await cmd(p.addr, [0x00]); if (id.code === 0xA0) part = ascii(id.data.slice(0, 7)); } catch {}
+  return (p.ecu = part && /^\d{7}$/.test(part) ? part : 'A' + h1(p.addr));
+}
+
 // ===================== Навигация =====================
-const state = { stack: [], scan: {}, module: null, poll: null };
+const state = { stack: [], scan: {}, module: null, poll: null, gauges: [], raf: 0 };
 function go(screen, params = {}, replace = false) {
   stopPoll();
   if (replace) state.stack.pop();
@@ -637,6 +764,7 @@ const cur = () => state.stack.at(-1);
 
 function render() {
   const { screen, params } = cur();
+  state.gauges = [];
   // путь
   $('crumbs').innerHTML = state.stack.map((s, i) => `<span data-i="${i}">${esc(SCREENS[s.screen].crumb(s.params))}</span>`).join('<i>›</i>');
   $('crumbs').querySelectorAll('span').forEach(sp => sp.onclick = () => {
@@ -789,7 +917,8 @@ const SCREENS = {
         tile('info', 'c1', 'Информация о блоке', 'Номер детали, версия ПО', () => go('ident', p)),
         tile('dtc', 'c3', 'Чтение кодов', 'Память неисправностей', () => go('faults', p)),
         tile('clear', 'c4', 'Стирание кодов', 'Очистить память', () => clearFaults(p.addr)),
-        tile('live', 'c2', 'Поток данных', 'Текущие параметры', () => go('live', p)),
+        tile('gauge', 'c5', 'Приборы', 'Обороты, температура и др.', () => go('dash', p)),
+        tile('live', 'c2', 'Поток данных', 'Сырые значения и подписи', () => go('live', p)),
       );
       v.appendChild(g);
     },
@@ -816,16 +945,57 @@ const SCREENS = {
       p.sel ??= 0; p.hist ??= {};
       v.appendChild(h('<div class="title">Поток данных <small id="liveState">остановлен</small></div>'));
       const box = h(`<div class="split">
-        <div class="card"><table class="grid"><thead><tr><th style="width:70px">Байт</th><th>HEX</th><th>DEC</th><th>Слово (байт+след.)</th></tr></thead><tbody id="liveBody"><tr><td colspan="4" class="empty">Нажмите «Старт»</td></tr></tbody></table></div>
+        <div class="card"><table class="grid live"><thead><tr><th style="width:50px">Байт</th><th style="width:56px">HEX</th><th style="width:56px">DEC</th><th>Параметр</th><th style="width:44px"></th></tr></thead><tbody id="liveBody"><tr><td colspan="5" class="empty">Нажмите «Старт»</td></tr></tbody></table></div>
         <div class="card"><div class="graph-head" id="graphHead">График байта</div><canvas id="graph"></canvas></div>
       </div>`);
       v.appendChild(box);
-      v.appendChild(h('<div class="hint info">Назначение байтов зависит от блока. Для Motronic 3.x байты 0–1 обычно — обороты двигателя. Нажмите на строку, чтобы построить её график.</div>'));
-      startPoll(p);
+      v.appendChild(h(`<div class="hint info"><b>Как подписать значения.</b> Нажмите ✎ в строке и укажите название, формулу и единицу —
+        значение появится на экране «Приборы». Подсказки: <b>обороты</b> растут при нажатии на газ (у Motronic 3.x обычно байты 0–1),
+        <b>температура</b> медленно растёт при прогреве, <b>напряжение</b> меняется при запуске двигателя. Нажмите на строку, чтобы увидеть её график.</div>`));
+      startPoll(p, liveFeed(p));
     },
     buttons: p => [
-      { icon: 'play', label: 'Старт', id: 'bStart', cls: 'act', onClick: () => startPoll(p) },
+      { icon: 'play', label: 'Старт', id: 'bStart', cls: 'act', onClick: () => startPoll(p, liveFeed(p)) },
       { icon: 'pause', label: 'Стоп', id: 'bStop', onClick: stopPoll },
+      { icon: 'gauge', label: 'Приборы', onClick: () => switchTo('dash', p) },
+    ],
+  },
+
+  dash: {
+    crumb: () => 'Приборы',
+    draw(v, p) {
+      v.appendChild(h('<div class="title">Приборы <small id="liveState">подготовка…</small></div>'));
+      const grid = h('<div class="gauges"></div>');
+      v.appendChild(grid);
+      const tools = h(`<div class="dash-tools">
+        <button class="lnk" id="bSetup">Подписать значения</button>
+        <button class="lnk" id="bExp">Экспорт настроек</button>
+        <button class="lnk" id="bImp">Импорт настроек</button></div>`);
+      v.appendChild(tools);
+      $('bSetup').onclick = () => switchTo('live', p);
+      $('bExp').onclick = exportSettings;
+      $('bImp').onclick = importSettings;
+      ensureEcu(p).then(() => {
+        if (cur().params !== p || cur().screen !== 'dash') return;
+        const params = getParams(p.ecu);
+        if (!params.length) {
+          grid.replaceWith(h(`<div class="card empty">
+            <div style="font-size:16px;color:var(--text);font-weight:600;margin-bottom:6px">Значения ещё не подписаны</div>
+            Откройте «Поток данных», найдите обороты, температуру и другие значения и подпишите их кнопкой ✎.<br>
+            Блок: <b>${esc(p.ecu)}</b></div>`));
+          $('liveState').textContent = '';
+          return;
+        }
+        params.forEach((q, i) => { const g = new Gauge(q, i); state.gauges.push(g); grid.appendChild(g.el); });
+        if (mode === 'demo') v.insertBefore(h('<div class="hint" style="margin:0 0 14px">Демо-режим: значения и подписи выдуманы, чтобы показать, как это выглядит.</div>'), grid);
+        startAnim();
+        startPoll(p, dashFeed(p));
+      });
+    },
+    buttons: p => [
+      { icon: 'play', label: 'Старт', cls: 'act', onClick: () => state.gauges.length && startPoll(p, dashFeed(p)) },
+      { icon: 'pause', label: 'Стоп', onClick: stopPoll },
+      { icon: 'live', label: 'Поток', onClick: () => switchTo('live', p) },
     ],
   },
 
@@ -1079,29 +1249,122 @@ function stopPoll() {
   if (state.poll) { state.poll.stop = true; state.poll = null; }
   const s = $('liveState'); if (s) s.textContent = 'остановлен';
 }
-async function startPoll(p) {
+const setLiveState = t => { const s = $('liveState'); if (s) s.textContent = t; };
+async function startPoll(p, onData) {
   if (state.poll) return;
   const job = { stop: false }; state.poll = job;
-  $('liveState').textContent = 'идёт опрос…';
+  setLiveState('идёт опрос…');
+  await ensureEcu(p);
   while (!job.stop) {
     try {
       const r = await cmd(p.addr, [0x0B, 0x03]);
       if (job.stop) break;
-      if (r.code !== 0xA0) { $('liveState').textContent = r.status; stopPoll(); break; }
-      drawLive(p, r.data);
-    } catch (e) { if (!job.stop) { $('liveState').textContent = errText(e); stopPoll(); } break; }
-    await sleep(250);
+      if (r.code !== 0xA0) { setLiveState(r.status); stopPoll(); break; }
+      p.last = r.data;
+      onData(r.data);
+    } catch (e) { if (!job.stop) { stopPoll(); setLiveState(errText(e)); } break; }
+    await sleep(200);
   }
 }
+const liveFeed = p => d => drawLive(p, d);
+const dashFeed = p => d => { for (const g of state.gauges) { const r = evalParam(g.p, d); if (r) g.set(r.v); } };
+// Переход между «Потоком данных» и «Приборами» без разрастания пути
+function switchTo(screen, p) {
+  if (state.stack.at(-2)?.screen === screen) back(); else go(screen, p);
+}
+
 function drawLive(p, d, record = true) {
-  if (record) {
-    p.last = d;
-    d.forEach((b, i) => { (p.hist[i] ??= []).push(b); if (p.hist[i].length > 120) p.hist[i].shift(); });
-  }
+  if (p.hist == null) p.hist = {};
+  if (record) d.forEach((b, i) => { (p.hist[i] ??= []).push(b); if (p.hist[i].length > 120) p.hist[i].shift(); });
   const tb = $('liveBody'); if (!tb) return;
-  tb.innerHTML = d.map((b, i) => `<tr class="click${i === p.sel ? ' sel' : ''}" data-i="${i}"><td class="mono">${i}</td><td class="mono">${h1(b)}</td><td class="mono">${b}</td><td class="mono">${i + 1 < d.length ? (b << 8 | d[i + 1]) : ''}</td></tr>`).join('');
-  tb.querySelectorAll('tr').forEach(tr => tr.onclick = () => { p.sel = +tr.dataset.i; drawLive(p, p.last, false); });
+  const params = getParams(p.ecu);
+  // Строки создаются один раз, дальше обновляются только ячейки — чтобы кнопки не «убегали» из-под пальца
+  if (tb.dataset.n !== String(d.length)) {
+    tb.innerHTML = '';
+    d.forEach((_, i) => {
+      const tr = document.createElement('tr');
+      tr.className = 'click';
+      tr.innerHTML = `<td class="mono">${i}</td><td class="mono"></td><td class="mono"></td><td class="pc"></td><td><button class="pen" title="Подписать значение">✎</button></td>`;
+      tr.onclick = () => { p.sel = i; drawLive(p, p.last, false); };
+      tr.querySelector('.pen').onclick = e => { e.stopPropagation(); editParam(p, i); };
+      tb.appendChild(tr);
+    });
+    tb.dataset.n = String(d.length);
+  }
+  d.forEach((b, i) => {
+    const tr = tb.rows[i];
+    tr.classList.toggle('sel', i === p.sel);
+    tr.cells[1].textContent = h1(b);
+    tr.cells[2].textContent = b;
+    const q = params.find(x => x.off === i);
+    let html;
+    if (q) { const r = evalParam(q, d); html = `<b>${esc(q.name)}</b> <span class="mono pv">${fmt(r?.v, q.dec)} ${esc(q.unit)}</span>`; }
+    else if (params.some(x => x.len === 2 && x.off === i - 1)) html = '<span class="pc-none">↑ вторая часть значения</span>';
+    else html = '<span class="pc-none">—</span>';
+    if (tr.cells[3].innerHTML !== html) tr.cells[3].innerHTML = html;
+  });
   drawGraph(p);
+}
+
+// Редактор подписи значения
+async function editParam(p, off, draft) {
+  const list = getParams(p.ecu);
+  const ex = list.find(q => q.off === off);
+  const q = draft || ex || { name: '', off, len: 1, f: 'x', unit: '', min: 0, max: 255, warn: null, dec: 0, type: 'dial' };
+  const html = `<div class="pform">
+    <label class="wide">Название<input id="pfName" class="field" value="${esc(q.name)}" placeholder="Например: Обороты двигателя" maxlength="40"></label>
+    <label>Номер байта<input id="pfOff" class="field" type="number" min="0" max="255" value="${q.off}"></label>
+    <label>Размер<select id="pfLen" class="field"><option value="1">1 байт</option><option value="2">2 байта (старший первым)</option></select></label>
+    <label class="wide">Формула пересчёта (x — сырое значение)<input id="pfF" class="field" value="${esc(q.f)}" placeholder="например x*0.1 или x-48"></label>
+    <label>Единица<input id="pfUnit" class="field" value="${esc(q.unit)}" placeholder="об/мин, °C, В" maxlength="12"></label>
+    <label>Знаков после запятой<input id="pfDec" class="field" type="number" min="0" max="3" value="${q.dec}"></label>
+    <label>Начало шкалы<input id="pfMin" class="field" type="number" step="any" value="${q.min}"></label>
+    <label>Конец шкалы<input id="pfMax" class="field" type="number" step="any" value="${q.max}"></label>
+    <label>Предупреждение от<input id="pfWarn" class="field" type="number" step="any" value="${q.warn ?? ''}" placeholder="не нужно"></label>
+    <label>Вид прибора<select id="pfType" class="field"><option value="dial">Стрелочный</option><option value="bar">Шкала</option><option value="number">Цифры</option></select></label>
+    <div class="wide pf-prev" id="pfPrev"></div>
+  </div>`;
+  const btns = [['Отмена', 0]];
+  if (ex) btns.push(['Удалить', 'del']);
+  btns.push(['Сохранить', 'save', 1]);
+  const pr = modal(ex ? 'Изменить подпись' : 'Подписать значение', html, btns);
+  $('pfLen').value = String(q.len); $('pfType').value = q.type;
+  const read = () => ({
+    name: $('pfName').value.trim(), off: +$('pfOff').value, len: +$('pfLen').value, f: $('pfF').value.trim() || 'x',
+    unit: $('pfUnit').value.trim(), dec: +$('pfDec').value, min: +$('pfMin').value, max: +$('pfMax').value,
+    warn: $('pfWarn').value === '' ? null : +$('pfWarn').value, type: $('pfType').value,
+  });
+  const preview = () => {
+    try {
+      const t = read(), fn = compileFormula(t.f), d = p.last || [];
+      if (t.off + t.len > d.length) { $('pfPrev').textContent = 'Нет данных для этого байта — запустите опрос.'; return; }
+      const raw = t.len === 2 ? (d[t.off] << 8 | d[t.off + 1]) : d[t.off];
+      $('pfPrev').innerHTML = `Сейчас: сырое значение <b>${raw}</b> → <b>${fmt(fn(raw), t.dec)} ${esc(t.unit)}</b>`;
+    } catch (e) { $('pfPrev').innerHTML = `<span style="color:var(--err)">${esc(e.message)}</span>`; }
+  };
+  document.querySelectorAll('.pform .field').forEach(el => el.oninput = preview);
+  preview();
+  const res = await pr;
+  if (!res) return;
+  let next = list.filter(x => x.off !== off);
+  if (res === 'save') {
+    const t = read();
+    try {
+      compileFormula(t.f);
+      if (!t.name) throw new Error('Укажите название.');
+      if (!(t.max > t.min)) throw new Error('Конец шкалы должен быть больше начала.');
+    } catch (e) {
+      await modal('Не сохранено', esc(e.message), [['Исправить', 0, 1]]);
+      return editParam(p, off, t);
+    }
+    const clean = sanitizeParam(t);
+    next = next.filter(x => x.off !== clean.off);
+    next.push(clean);
+    next.sort((a, b) => a.off - b.off);
+  }
+  setParams(p.ecu, next);
+  log('inf', `Подписи блока ${p.ecu}: ${res === 'del' ? 'удалена' : 'сохранена'} подпись байта ${off}.`);
+  if (p.last && $('liveBody')) drawLive(p, p.last, false);
 }
 function drawGraph(p) {
   const c = $('graph'); if (!c) return;
@@ -1125,6 +1388,131 @@ function drawGraph(p) {
     i ? g.lineTo(x, y) : g.moveTo(x, y);
   });
   g.stroke();
+}
+
+// ===================== Приборы =====================
+const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const ARC0 = 150, ARC = 240, GR = 78;                 // шкала от 150° до 390° (по часовой), радиус
+const polar = (deg, r = GR) => { const a = deg * Math.PI / 180; return [100 + r * Math.cos(a), 100 + r * Math.sin(a)]; };
+const arcPath = (a0, a1, r = GR) => {
+  const [x0, y0] = polar(a0, r), [x1, y1] = polar(a1, r);
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+};
+const shortNum = n => Math.abs(n) >= 1000 ? (n / 1000).toFixed(n % 1000 ? 1 : 0).replace('.', ',') + 'k' : String(+n.toFixed(1)).replace('.', ',');
+let gaugeId = 0;
+
+class Gauge {
+  constructor(q, i) {
+    this.p = q; this.span = q.max - q.min;
+    this.cur = q.min; this.target = q.min; this.has = false;
+    this.t0 = performance.now();
+    const el = this.el = document.createElement('div');
+    el.className = 'gauge gt-' + q.type;
+    el.style.setProperty('--i', i);
+    const warnF = q.warn != null && q.warn < q.max ? clamp01((q.warn - q.min) / this.span) : null;
+    if (q.type === 'dial') {
+      const id = 'gg' + (++gaugeId);
+      this.L = Math.PI * 2 * GR * ARC / 360;
+      let ticks = '', labels = '';
+      for (let k = 0; k <= 20; k++) {
+        const a = ARC0 + ARC * k / 20, major = k % 5 === 0;
+        const [x0, y0] = polar(a, GR - 12), [x1, y1] = polar(a, GR - (major ? 22 : 17));
+        ticks += `<line x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y1.toFixed(1)}" class="g-tick${major ? ' maj' : ''}"/>`;
+      }
+      for (let k = 0; k <= 4; k++) {
+        const [x, y] = polar(ARC0 + ARC * k / 4, GR - 33);
+        labels += `<text x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" class="g-lbl">${shortNum(q.min + this.span * k / 4)}</text>`;
+      }
+      el.innerHTML = `<div class="g-name">${esc(q.name)}</div>
+        <svg viewBox="0 0 200 168" class="g-svg">
+          <defs><linearGradient id="${id}" x1="0" x2="1" y1="0" y2="0"><stop offset="0" style="stop-color:var(--blue)"/><stop offset="1" style="stop-color:#6fd3ff"/></linearGradient></defs>
+          <path d="${arcPath(ARC0, ARC0 + ARC)}" class="g-track"/>
+          ${warnF != null ? `<path d="${arcPath(ARC0 + ARC * warnF, ARC0 + ARC, GR + 9)}" class="g-warnzone"/>` : ''}
+          <path d="${arcPath(ARC0, ARC0 + ARC)}" class="g-arc" stroke="url(#${id})" stroke-dasharray="${this.L.toFixed(2)}" stroke-dashoffset="${this.L.toFixed(2)}"/>
+          ${ticks}${labels}
+          <g class="g-needle" transform="rotate(${ARC0} 100 100)"><line x1="88" y1="100" x2="${100 + GR - 16}" y2="100"/><circle cx="100" cy="100" r="7"/><circle cx="100" cy="100" r="2.5" class="g-cap"/></g>
+          <text x="100" y="146" class="g-val">—</text>
+          <text x="100" y="163" class="g-unit">${esc(q.unit)}</text>
+        </svg>`;
+      this.arc = el.querySelector('.g-arc');
+      this.needle = el.querySelector('.g-needle');
+    } else {
+      el.innerHTML = `<div class="g-name">${esc(q.name)}</div>
+        <div class="g-big"><span class="g-val">—</span><small>${esc(q.unit)}</small></div>
+        <div class="g-bar"><div class="g-fill"></div>${warnF != null ? `<i class="g-mark" style="left:${(warnF * 100).toFixed(1)}%"></i>` : ''}</div>
+        <div class="g-range"><span>${fmt(q.min, q.dec)}</span><span>${fmt(q.max, q.dec)}</span></div>`;
+      this.fill = el.querySelector('.g-fill');
+    }
+    this.val = el.querySelector('.g-val');
+    this.render();
+  }
+  set(v) { if (v == null) return; this.target = v; this.has = true; }
+  step(now) {
+    // Первые ~0,9 с — «прогон» стрелки до максимума и обратно, как на приборке при включении зажигания
+    const t = now - this.t0;
+    let tgt = this.has ? this.target : this.p.min;
+    if (!REDUCED_MOTION && t < 900) tgt = t < 450 ? this.p.max : this.p.min;
+    const d = tgt - this.cur;
+    this.cur = REDUCED_MOTION || Math.abs(d) < this.span * 0.0005 ? tgt : this.cur + d * (t < 900 ? 0.16 : 0.12);
+    this.render(this.has || (!REDUCED_MOTION && t < 1400));
+  }
+  render(showValue = false) {
+    const f = clamp01((this.cur - this.p.min) / this.span);
+    const warn = this.has && this.p.warn != null && this.target >= this.p.warn;
+    this.el.classList.toggle('warn', warn);
+    const txt = showValue ? fmt(this.cur, this.p.dec) : '—';
+    if (this.val.textContent !== txt) this.val.textContent = txt;
+    if (this.p.type === 'dial') {
+      this.arc.style.strokeDashoffset = (this.L * (1 - f)).toFixed(2);
+      this.needle.setAttribute('transform', `rotate(${(ARC0 + ARC * f).toFixed(2)} 100 100)`);
+    } else {
+      this.fill.style.width = (f * 100).toFixed(2) + '%';
+    }
+  }
+}
+function startAnim() {
+  if (state.raf) return;
+  const loop = now => {
+    if (!state.gauges.length) { state.raf = 0; return; }
+    for (const g of state.gauges) g.step(now);
+    state.raf = requestAnimationFrame(loop);
+  };
+  state.raf = requestAnimationFrame(loop);
+}
+
+// ===================== Экспорт / импорт настроек =====================
+// Подписи и привязки кодов хранятся в браузере. Файл позволяет перенести их на телефон или другому человеку.
+function exportSettings() {
+  const data = { app: 'bmw-ds2', version: 1, saved: new Date().toISOString(), params: loadParams(), dtc: loadMap() };
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  a.download = 'bmw-ds2-nastroyki.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function importSettings() {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.json,application/json';
+  inp.onchange = async () => {
+    try {
+      const j = JSON.parse(await inp.files[0].text());
+      if (j.app !== 'bmw-ds2') throw new Error('это не файл настроек этого приложения');
+      const params = {}, dtc = {};
+      for (const [k, arr] of Object.entries(j.params || {})) {
+        if (Array.isArray(arr)) params[String(k).slice(0, 32)] = arr.map(sanitizeParam).filter(q => q && q.name);
+      }
+      for (const [k, v] of Object.entries(j.dtc || {})) {
+        if (!/^[\w]{1,32}:\d{1,3}$/.test(k) || !v || typeof v !== 'object') continue;
+        if (v.ref && DTC_DB[v.ref]) dtc[k] = { ref: v.ref };
+        else if (typeof v.text === 'string') dtc[k] = { text: v.text.slice(0, 120) };
+      }
+      saveParams({ ...loadParams(), ...params });
+      saveMap({ ...loadMap(), ...dtc });
+      await modal('Импорт настроек', `Загружено: подписей для блоков — <b>${Object.keys(params).length}</b>, привязок кодов — <b>${Object.keys(dtc).length}</b>.`, [['OK', 0, 1]]);
+      render();
+    } catch (e) { modal('Импорт настроек', 'Не удалось прочитать файл: ' + esc(e.message), [['OK', 0, 1]]); }
+  };
+  inp.click();
 }
 
 async function sendRaw() {
