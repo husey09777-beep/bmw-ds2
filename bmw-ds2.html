@@ -56,6 +56,12 @@
   .title { font-size: 18px; font-weight: 600; margin: 0 0 14px; display: flex; align-items: center; gap: 10px; }
   .title small { font-size: 13px; color: var(--muted); font-weight: 400; }
 
+  .subhead { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 22px 0 10px; }
+  .title + .subhead { margin-top: 4px; }
+  .readiness td:last-child { white-space: nowrap; }
+  .dtc-sec { padding: 10px 16px; background: var(--bg); border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  .dtc-sec b { color: var(--text); }
+
   /* Плитки */
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
   .tile { font: inherit; color: inherit; width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px 12px 14px; text-align: center; cursor: pointer;
@@ -358,8 +364,8 @@
 </header>
 
 <div class="vehicle">
-  <div>Автомобиль: <b>BMW E30 / E34</b></div>
-  <div>Протокол: <b>DS2 · K-line · 9600 8E1</b></div>
+  <div>Автомобиль: <b id="vehCar">BMW E30 / E34</b></div>
+  <div>Протокол: <b id="vehProto">DS2 · K-line · 9600 8E1</b></div>
   <div>Адаптер: <b id="vehAdapter">—</b></div>
 </div>
 
@@ -508,6 +514,7 @@ function lookup(ecu, code) {
 }
 
 const ICON = {
+  car: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3v-5l2-5h14l2 5v5h-2"/><path d="M3 12h18"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><path d="M9.5 17h5"/></svg>',
   edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>',
   alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
   gauge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3.5 17a9 9 0 1117 0"/><path d="M12 17l4.5-6"/><circle cx="12" cy="17" r="1.5"/></svg>',
@@ -807,7 +814,7 @@ async function ensureEcu(p) {
 // Экраны лежат в стеке. Каждый переход записывается в историю браузера,
 // поэтому системная кнопка «Назад» (Android, браузер) возвращает на предыдущий экран.
 const state = { stack: [], scan: {}, module: null, poll: null, gauges: [], raf: 0 };
-const OFFLINE_SCREENS = new Set(['dtcref', 'help', 'log']);   // открываются по ссылке и без подключения
+const OFFLINE_SCREENS = new Set(['dtcref', 'help', 'log', 'polo', 'polohelp', 'polodtcref']);   // открываются по ссылке и без подключения
 const hashFor = stack => '#/' + stack.slice(1).map(s => s.screen + (s.params.addr != null ? '-' + h1(s.params.addr).toLowerCase() : '')).join('/');
 function go(screen, params = {}, replace = false) {
   stopPoll();
@@ -854,6 +861,7 @@ function render(moveFocus = false) {
   drawBar(SCREENS[screen].buttons ? SCREENS[screen].buttons(params) : []);
   document.title = (screen === 'home' ? '' : SCREENS[screen].crumb(params) + ' · ') + 'BMW DS2 Диагностика';
   $('logBtn').setAttribute('aria-pressed', String(screen === 'log'));
+  refreshVci();
   if (moveFocus) { document.querySelector('.screen').scrollTop = 0; v.focus({ preventScroll: true }); }
 }
 
@@ -893,7 +901,7 @@ function tile(icon, color, name, desc, onClick, needsConnection) {
   d.className = 'tile' + (needsConnection ? ' off' : '');
   d.innerHTML = `<span class="ic ${color}">${ICON[icon]}</span><span class="nm">${name}</span><span class="ds">${desc}</span>`;
   // Недоступная плитка не молчит, а объясняет, почему
-  if (needsConnection) { d.setAttribute('aria-disabled', 'true'); d.onclick = () => needConn(); }
+  if (needsConnection) { d.setAttribute('aria-disabled', 'true'); d.onclick = () => (typeof needsConnection === 'function' ? needsConnection() : needConn()); }
   else d.onclick = onClick;
   return d;
 }
@@ -956,12 +964,18 @@ function modal(title, text, buttons) {
 const needConn = () => { if (!transport) { modal('Нет связи', 'Сначала подключите адаптер или включите демо-режим.', [['OK', 0, 1]]); return true; } return false; };
 
 // ===================== Подключение =====================
-function setVci(m) {
-  mode = m;
+function setVci(m) { mode = m; refreshVci(); }
+// Индикатор и строка автомобиля показывают тот раздел (BMW или VW), в котором вы сейчас находитесь
+function refreshVci() {
+  const isPolo = !!cur()?.screen?.startsWith('polo');
+  const m = isPolo ? elmMode : mode;
+  const tr = isPolo ? elm : transport;
   $('vci').className = 'vci' + (m === 'demo' ? ' demo' : m ? ' on' : '');
   $('vciText').textContent = m === 'demo' ? 'Демо-режим' : m ? 'Адаптер подключён' : 'Адаптер не подключён';
   $('vciShort').textContent = m === 'demo' ? 'Демо' : m ? 'Связь' : 'Нет связи';
-  $('vehAdapter').textContent = m === 'demo' ? 'демо (данные выдуманы)' : m ? transport.label : '—';
+  $('vehCar').textContent = isPolo ? 'VW Polo 2013' : 'BMW E30 / E34';
+  $('vehProto').textContent = isPolo ? (polo.proto || 'OBD2 · CAN 500 кбит/с') : 'DS2 · K-line · 9600 8E1';
+  $('vehAdapter').textContent = m === 'demo' ? 'демо (данные выдуманы)' : m ? tr.label : '—';
 }
 async function connect(kind) {
   try {
@@ -989,7 +1003,8 @@ const SCREENS = {
   home: {
     crumb: () => 'Главная',
     draw(v) {
-      v.appendChild(h('<div class="title">Диагностика BMW <small>DS2 · модели до 2001 г.</small></div>'));
+      v.appendChild(h('<div class="title">Диагностика <small>BMW DS2 · VW Polo OBD2</small></div>'));
+      v.appendChild(h('<h2 class="subhead">BMW E30 / E34 · DS2</h2>'));
       const g = h('<div class="tiles"></div>');
       const useUsb = IS_ANDROID || (!('serial' in navigator) && 'usb' in navigator);
       if (!transport) {
@@ -1003,11 +1018,18 @@ const SCREENS = {
         tile('ecu', 'c1', 'Блоки управления', 'Выбор системы вручную', () => go('systems'), !transport),
         tile('term', 'c5', 'Ручная команда', 'Отправка DS2-запроса', () => go('raw'), !transport),
         tile('dtc', 'c4', 'Справочник кодов', 'Расшифровка и что делать', () => go('dtcref')),
-        tile('log', 'c6', 'Журнал обмена', 'Все запросы и ответы', () => go('log')),
         tile('help', 'c3', 'Подключение', 'Кабель, переходник, распиновка', () => go('help')),
       );
       if (transport) g.append(tile('off', 'c4', 'Отключить', mode === 'demo' ? 'Выйти из демо' : 'Закрыть порт', disconnect));
       v.appendChild(g);
+      v.appendChild(h('<h2 class="subhead">VW Polo 2013 · OBD2</h2>'));
+      const g2 = h('<div class="tiles"></div>');
+      g2.append(tile('car', 'c1', 'VW Polo 2013', elm ? 'ELM327 подключён' : 'Двигатель через ELM327', () => go('polo')));
+      v.appendChild(g2);
+      v.appendChild(h('<h2 class="subhead">Общее</h2>'));
+      const g3 = h('<div class="tiles"></div>');
+      g3.append(tile('log', 'c6', 'Журнал обмена', 'Все запросы и ответы', () => go('log')));
+      v.appendChild(g3);
       if (useUsb && !('usb' in navigator)) v.appendChild(h('<div class="hint bad">Этот браузер не умеет работать с USB-устройствами — доступен только демо-режим. Откройте страницу в Chrome для Android.</div>'));
       else if (!useUsb && !('serial' in navigator)) v.appendChild(h('<div class="hint bad">Этот браузер не поддерживает Web Serial — доступен только демо-режим. Откройте страницу в Chrome или Edge.</div>'));
       else if (useUsb && !transport) v.appendChild(h('<div class="hint info">На телефоне работают только кабели на чипе <b>FTDI</b> (FT232). Подключите кабель через переходник USB OTG, затем нажмите «Подключить кабель» и выберите его в списке.</div>'));
@@ -1148,6 +1170,190 @@ const SCREENS = {
     ],
   },
 
+  // ===================== Раздел VW Polo 2013 =====================
+  polo: {
+    crumb: () => 'VW Polo',
+    draw(v) {
+      v.appendChild(h('<div class="title">VW Polo 2013 <small>OBD2 · блок двигателя</small></div>'));
+      const g = h('<div class="tiles"></div>');
+      if (!elm) g.append(
+        tile('plug', 'c1', 'Подключить ELM327', 'USB или Bluetooth', () => poloConnect('serial')),
+        tile('demo', 'c3', 'Демо-режим', 'Без машины, данные выдуманы', () => poloConnect('demo')));
+      const off = !elm && needElm;
+      g.append(
+        tile('dtc', 'c4', 'Ошибки двигателя', 'Чтение и расшифровка', () => go('polodtc'), off),
+        tile('gauge', 'c5', 'Приборы', 'Обороты, температура и др.', () => go('polodash'), off),
+        tile('car', 'c1', 'Об автомобиле', 'VIN, готовность систем', () => go('poloinfo'), off),
+        tile('clear', 'c4', 'Стереть ошибки', 'Сброс памяти двигателя', poloClear, off),
+        tile('info', 'c2', 'Справочник кодов', 'P-коды с расшифровкой', () => go('polodtcref')),
+        tile('help', 'c3', 'Подключение', 'Где разъём, какой адаптер', () => go('polohelp')),
+      );
+      if (elm) g.append(tile('off', 'c6', 'Отключить', elmMode === 'demo' ? 'Выйти из демо' : 'Закрыть порт', poloDisconnect));
+      v.appendChild(g);
+      if (!('serial' in navigator)) v.appendChild(h(IS_ANDROID
+        ? '<div class="hint bad">На телефоне раздел VW Polo пока работает только в демо-режиме: браузер не может подключиться к ELM327. Используйте компьютер с Chrome или Edge.</div>'
+        : '<div class="hint bad">Этот браузер не поддерживает Web Serial — доступен только демо-режим. Откройте страницу в Chrome или Edge.</div>'));
+      else if (!elm) v.appendChild(h('<div class="hint info">Вставьте ELM327 в разъём OBD2 (под панелью слева от рулевой колонки), включите зажигание, нажмите «Подключить ELM327» и выберите порт адаптера.</div>'));
+      v.appendChild(h('<div class="hint">Через стандартный OBD2 доступен только <b>блок двигателя</b>. ABS, подушки безопасности, коробка и кузовные блоки VW используют свой протокол — для них нужны VCDS или «ВАСЯ Диагност».</div>'));
+    },
+  },
+
+  polodtc: {
+    crumb: () => 'Ошибки двигателя',
+    draw(v, p) {
+      v.appendChild(h('<div class="title">Ошибки двигателя <small>VW Polo · OBD2</small></div>'));
+      const box = h('<div class="card"><div class="empty" role="status">Чтение ошибок…</div></div>');
+      v.appendChild(box);
+      (async () => {
+        try {
+          let mil = null;
+          try { const d = await readPid(0x01); mil = { on: !!(d[0] & 0x80) }; } catch {}
+          const stored = await readDtcs('03');
+          const pending = await readDtcs('07');
+          let perm = []; try { perm = await readDtcs('0A'); } catch {}
+          if (cur().params !== p) return;
+          const total = new Set([...stored, ...pending, ...perm]).size;
+          const milHtml = mil == null ? '' : mil.on ? '<span class="badge b-err">Check Engine горит</span>' : '<span class="badge b-ok">Check Engine не горит</span>';
+          const demo = elmMode === 'demo' ? '<span class="badge b-warn">демо: данные выдуманы</span>' : '';
+          const wrap = h('<div></div>');
+          if (!total) {
+            wrap.appendChild(h(`<div class="card big-ok"><div class="n" style="color:var(--ok)">0</div><div class="l">Ошибок двигателя нет</div><p>${milHtml} ${demo}</p></div>`));
+          } else {
+            const card = h(`<div class="card"><div class="sumbar"><span>Найдено кодов: <b class="n">${total}</b></span>${milHtml}${demo}</div></div>`);
+            const section = (title, list, note) => {
+              if (!list.length) return;
+              card.appendChild(h(`<div class="dtc-sec"><b>${title}</b> — ${note}</div>`));
+              for (const code of list) { const info = obdInfo(code); card.appendChild(dtcCard(esc(code), info, '', !info.known)); }
+            };
+            section('Подтверждённые', stored, 'из-за них горит Check Engine');
+            section('Ожидающие', pending, 'замечены один раз, ещё не подтверждены');
+            section('Постоянные', perm, 'сотрутся сами, когда блок убедится, что неисправность устранена');
+            wrap.appendChild(card);
+          }
+          wrap.appendChild(h('<div class="hint info">Показаны только ошибки блока двигателя: другие блоки VW через стандартный OBD2 не читаются.</div>'));
+          box.replaceWith(wrap);
+          announce(total ? `Найдено кодов неисправностей: ${total}` : 'Ошибок двигателя нет');
+        } catch (e) {
+          if (cur().params !== p) return;
+          box.innerHTML = `<div class="empty"><span class="badge b-err">Нет связи</span><p>${esc(e.message === 'timeout' ? 'Адаптер не ответил. Проверьте подключение и зажигание.' : e.message)}</p></div>`;
+        }
+      })();
+    },
+    buttons: p => [
+      { icon: 'refresh', label: 'Обновить', onClick: () => go('polodtc', p, true) },
+      { icon: 'clear', label: 'Стереть', cls: 'red', onClick: poloClear },
+    ],
+  },
+
+  polodash: {
+    crumb: () => 'Приборы',
+    draw(v) {
+      v.appendChild(h('<div class="title">Приборы двигателя <small id="liveState" role="status">подготовка…</small></div>'));
+      const list = OBD_PIDS.filter(q => polo.supported?.has(q.pid));
+      if (!list.length) { v.appendChild(h('<div class="card empty">Блок двигателя не сообщил ни одного параметра. Переподключите адаптер.</div>')); return; }
+      if (elmMode === 'demo') v.appendChild(h('<div class="hint" style="margin:0 0 14px">Демо-режим: значения выдуманы, чтобы показать, как это выглядит.</div>'));
+      const grid = h('<div class="gauges"></div>');
+      v.appendChild(grid);
+      list.forEach((q, i) => { const g = new Gauge(q, i); state.gauges.push(g); grid.appendChild(g.el); });
+      v.appendChild(h(`<div class="hint info">Показаны ${list.length} параметров, которые сообщает блок двигателя вашей машины. Названия и формулы — стандартные для OBD2, подписывать ничего не нужно.</div>`));
+      startAnim();
+      poloPoll();
+    },
+    buttons: () => [
+      { icon: 'play', label: 'Старт', id: 'bStart', cls: 'act', busy: false, onClick: () => state.gauges.length && poloPoll() },
+      { icon: 'pause', label: 'Стоп', id: 'bStop', onClick: stopPoll },
+    ],
+  },
+
+  poloinfo: {
+    crumb: () => 'Об автомобиле',
+    draw(v, p) {
+      v.appendChild(h('<div class="title">Об автомобиле <small>VW Polo · OBD2</small></div>'));
+      const box = h('<div class="card"><div class="empty" role="status">Чтение данных…</div></div>');
+      v.appendChild(box);
+      (async () => {
+        try {
+          let vin = null;
+          try {
+            const lines = await obd('0902', 5000);
+            const bytes = polo.can ? (b => { const i = b.findIndex((x, k) => x === 0x49 && b[k + 1] === 0x02); return i < 0 ? [] : b.slice(i + 3); })(obdBytes(lines))
+              : lines.map(l => obdBytes([l])).filter(b => b[0] === 0x49).flatMap(b => b.slice(3));
+            vin = bytes.filter(x => x >= 0x30 && x <= 0x5A).map(x => String.fromCharCode(x)).join('').slice(-17) || null;
+          } catch {}
+          let volt = null; try { volt = (await elmCmd('ATRV'))[0]; } catch {}
+          let d01 = null; try { d01 = await readPid(0x01); } catch {}
+          if (cur().params !== p) return;
+          const rows = [
+            ['VIN', vin ? `<span class="mono">${esc(vin)}</span>` : 'блок не сообщил'],
+            ['Протокол', esc(polo.proto || '—')],
+            ['Адаптер', esc(elm.label)],
+            ['Напряжение (по адаптеру)', esc(volt || '—')],
+            ['Check Engine', d01 ? (d01[0] & 0x80 ? '<span class="badge b-err">горит</span>' : '<span class="badge b-ok">не горит</span>') : '—'],
+            ['Подтверждённых ошибок', d01 ? String(d01[0] & 0x7F) : '—'],
+          ];
+          const wrap = h('<div></div>');
+          wrap.appendChild(h(`<div class="card"><table class="grid"><tbody>${rows.map(([k, val]) => `<tr><td style="width:45%">${k}</td><td>${val}</td></tr>`).join('')}</tbody></table></div>`));
+          if (d01) {
+            const rr = readinessRows(d01);
+            const ready = rr.filter(r => r.done).length;
+            wrap.appendChild(h(`<h2 class="subhead">Готовность систем · ${ready} из ${rr.length}</h2>`));
+            wrap.appendChild(h(`<div class="card"><table class="grid readiness"><thead><tr><th>Система самодиагностики</th><th>Статус</th></tr></thead><tbody>
+              ${rr.map(r => `<tr><td>${r.name}</td><td>${r.done ? '<span class="badge b-ok">проверено</span>' : '<span class="badge b-warn">не проверено</span>'}</td></tr>`).join('')}</tbody></table></div>`));
+            wrap.appendChild(h('<div class="hint info">«Не проверено» — блок двигателя ещё не закончил самопроверку этой системы. Так бывает после стирания ошибок или отключения аккумулятора: обычно всё проверяется за несколько дней обычной езды.</div>'));
+          }
+          if (elmMode === 'demo') wrap.appendChild(h('<div class="hint">Демо-режим: VIN и остальные данные выдуманы.</div>'));
+          box.replaceWith(wrap);
+        } catch (e) {
+          if (cur().params !== p) return;
+          box.innerHTML = `<div class="empty"><span class="badge b-err">Нет связи</span><p>${esc(e.message)}</p></div>`;
+        }
+      })();
+    },
+    buttons: p => [{ icon: 'refresh', label: 'Обновить', onClick: () => go('poloinfo', p, true) }],
+  },
+
+  polodtcref: {
+    crumb: () => 'Справочник P-кодов',
+    draw(v) {
+      v.appendChild(h(`<div class="title">Справочник кодов OBD2 <small>${Object.keys(OBD_DB).length} кодов · VW Polo 2013, 1.6 MPI</small></div>`));
+      const inp = h('<input class="search" aria-label="Поиск по коду или слову" placeholder="Код (например P0301) или слово (пропуски, зонд, дроссель…)">');
+      const card = h('<div class="card"></div>');
+      const draw = () => {
+        const q = inp.value.trim().toLowerCase();
+        card.innerHTML = '';
+        const keys = Object.keys(OBD_DB).sort().filter(k => !q || k.toLowerCase().includes(q) ||
+          (OBD_DB[k].plain + ' ' + OBD_DB[k].official).toLowerCase().includes(q));
+        if (!keys.length) { card.appendChild(h('<div class="empty">Ничего не найдено</div>')); return; }
+        keys.forEach(k => card.appendChild(dtcCard(k, OBD_DB[k], '', false)));
+      };
+      inp.oninput = draw;
+      v.append(inp, card);
+      v.appendChild(h('<div class="hint info">Официальные названия — по стандарту SAE J2012, одинаковые для всех машин с OBD2. Советы по ремонту учитывают особенности мотора 1.6 MPI на Polo седан. Коды, начинающиеся на P1, — коды производителя VAG: их смотрите в VCDS или «ВАСЯ Диагност».</div>'));
+      draw();
+    },
+  },
+
+  polohelp: {
+    crumb: () => 'Подключение ELM327',
+    draw(v) {
+      v.appendChild(h('<div class="title">Подключение ELM327 к VW Polo</div>'));
+      v.appendChild(h(`<div class="card help">
+        <h3>1. Адаптер</h3>
+        <p>Подходит обычный <b>ELM327</b> (лучше версии 1.5) — с USB-кабелем или Bluetooth. Адаптеры с Wi-Fi браузер подключить не может.</p>
+        <h3>2. Разъём в машине</h3>
+        <p>Стандартный 16-контактный разъём <b>OBD2</b> находится под панелью слева от рулевой колонки. Переходник не нужен.</p>
+        <h3>3. Подключение к компьютеру</h3>
+        <p><b>USB-адаптер:</b> вставьте в компьютер. Если Windows его не видит — установите драйвер чипа (часто это CH340).</p>
+        <p><b>Bluetooth-адаптер:</b> в настройках Windows добавьте устройство Bluetooth (PIN обычно 1234 или 0000). Windows создаст для него COM-порт — его и нужно выбрать в списке.</p>
+        <h3>4. Связь</h3>
+        <p>Включите зажигание (можно завести двигатель), нажмите «Подключить ELM327» и выберите порт. Приложение само подберёт скорость и протокол (CAN 500 кбит/с).</p>
+        <h3>Что доступно</h3>
+        <p>Ошибки двигателя и их стирание, показания в реальном времени (обороты, температура, коррекции топлива и т.д.), VIN и готовность систем. Блоки ABS, подушек, коробки и кузова используют протокол VW, а не OBD2, — для них нужны VCDS или «ВАСЯ Диагност».</p>
+        <p>На телефоне раздел VW Polo пока работает только в демо-режиме.</p>
+      </div>`));
+    },
+  },
+
   raw: {
     crumb: () => 'Ручная команда',
     draw(v) {
@@ -1179,7 +1385,7 @@ const SCREENS = {
     crumb: () => 'Справочник кодов',
     draw(v) {
       v.appendChild(h(`<div class="title">Справочник кодов Motronic <small>${Object.keys(DTC_DB).length} кодов · E30 / E34 / E36 ≈1987–1995</small></div>`));
-      const inp = h('<input class="search" placeholder="Код (например 1222) или слово (лямбда, форсунка, датчик…)">');
+      const inp = h('<input class="search" aria-label="Поиск по коду или слову" placeholder="Код (например 1222) или слово (лямбда, форсунка, датчик…)">');
       const card = h('<div class="card"></div>');
       const draw = () => {
         const q = inp.value.trim().toLowerCase();
@@ -1706,6 +1912,377 @@ async function sendRaw() {
       <tr><td>Статус</td><td><span class="badge ${r[2] === 0xA0 ? 'b-ok' : 'b-warn'}">${esc(RESP[r[2]] || 'Код ' + h1(r[2]))}</span></td></tr>
       <tr><td>Данные (ASCII)</td><td class="mono">${esc(ascii(d)) || '—'}</td></tr></tbody></table>`;
   } catch (e) { out.innerHTML = `<div class="empty"><span class="badge b-err">Ошибка</span><p>${esc(errText(e))}</p></div>`; }
+}
+
+// =====================================================================
+// ===================== VW Polo 2013: ELM327 / OBD2 ====================
+// =====================================================================
+// Polo 2013 работает по стандартному OBD2 через шину CAN (ISO 15765-4, 500 кбит/с).
+// Стандарт OBD2 открывает только блок двигателя; ABS, подушки, коробка и т.п. — по протоколу VAG, его здесь нет.
+
+// Транспорт: ELM327 через Web Serial (USB-ELM или Bluetooth-ELM, сопряжённый с компьютером как COM-порт)
+class ElmTransport {
+  constructor() { this.buf = ''; this.waiters = []; }
+  get label() { return (this.version || 'ELM327') + (this.baud ? `, ${this.baud} бод` : ''); }
+  async open() {
+    if (!('serial' in navigator)) throw new Error('Браузер не поддерживает Web Serial. Откройте страницу в Chrome или Edge на компьютере.');
+    this.port = await navigator.serial.requestPort();
+    // Скорость у разных ELM327 разная — пробуем по очереди. Для Bluetooth-адаптеров она не важна.
+    for (const baud of [38400, 115200, 9600, 57600]) {
+      try { await this.port.open({ baudRate: baud, bufferSize: 4096 }); }
+      catch (e) { throw new Error('Не удалось открыть порт: ' + e.message); }
+      this.writer = this.port.writable.getWriter();
+      this.readLoop();
+      try {
+        const r = await this.raw('ATZ', 2500);
+        if (/ELM|OBD/i.test(r)) { this.baud = baud; this.version = (r.match(/ELM327\s*v?[\d.]+/i) || ['ELM327'])[0]; return; }
+      } catch {}
+      await this.close(true);
+    }
+    throw new Error('Адаптер ELM327 не ответил. Проверьте, что выбран правильный порт и адаптер вставлен в разъём OBD2 (на Polo — под рулевой колонкой слева).');
+  }
+  async readLoop() {
+    this.reader = this.port.readable.getReader();
+    const dec = new TextDecoder();
+    try {
+      while (true) {
+        const { value, done } = await this.reader.read();
+        if (done) break;
+        this.buf += dec.decode(value, { stream: true });
+        this.waiters.forEach(w => w());
+      }
+    } catch {} finally { try { this.reader.releaseLock(); } catch {} }
+  }
+  // Ответ ELM327 заканчивается приглашением «>»
+  waitPrompt(timeout) {
+    return new Promise((resolve, reject) => {
+      let timer;
+      const done = () => { clearTimeout(timer); this.waiters = this.waiters.filter(w => w !== check); };
+      const check = () => {
+        const i = this.buf.indexOf('>');
+        if (i >= 0) { done(); const out = this.buf.slice(0, i); this.buf = this.buf.slice(i + 1); resolve(out); }
+      };
+      timer = setTimeout(() => { done(); reject(new Error('timeout')); }, timeout);
+      this.waiters.push(check);
+      check();
+    });
+  }
+  async raw(text, timeout = 3000) {
+    this.buf = '';
+    await this.writer.write(new TextEncoder().encode(text + '\r'));
+    return this.waitPrompt(timeout);
+  }
+  async close(keepPort = false) {
+    try { await this.reader?.cancel(); } catch {}
+    await sleep(30);
+    try { this.writer?.releaseLock(); } catch {}
+    try { await this.port?.close(); } catch {}
+    if (!keepPort) this.port = null;
+  }
+}
+
+// Демо-адаптер: отвечает как ELM327 на Polo 2013 с двумя ошибками. Все данные выдуманы.
+class ElmDemo {
+  get label() { return 'демо ELM327 (данные выдуманы)'; }
+  async open() { this.t0 = Date.now(); this.cleared = false; this.version = 'ELM327 v1.5'; }
+  async close() {}
+  async raw(text) {
+    await sleep(20 + Math.random() * 25);
+    const c = text.toUpperCase().replace(/\s/g, '');
+    const hx = a => a.map(x => h1(Math.max(0, Math.min(255, Math.round(x))))).join('');
+    if (c.startsWith('AT')) {
+      if (c === 'ATZ') return '\r\rELM327 v1.5\r\r';
+      if (c === 'ATRV') return '14.1V\r\r';
+      if (c === 'ATDPN') return 'A6\r\r';
+      if (c === 'ATDP') return 'AUTO, ISO 15765-4 (CAN 11/500)\r\r';
+      return 'OK\r\r';
+    }
+    const t = (Date.now() - this.t0) / 1000, thr = Math.max(0, Math.sin(t / 1.7)) ** 3;
+    if (c === '03') return (this.cleared ? '4300' : '430203012187') + '\r\r';    // P0301, P2187
+    if (c === '07') return '4700\r\r';
+    if (c === '0A') return 'NO DATA\r\r';
+    if (c === '04') { this.cleared = true; return '44\r\r'; }
+    if (c === '0902') {
+      const vin = 'DEMO1POLO20130000';
+      const all = [0x49, 0x02, 0x01, ...[...vin].map(ch => ch.charCodeAt(0))];
+      let s = '014\r0:' + hx(all.slice(0, 6)) + '\r';
+      for (let k = 6, n = 1; k < all.length; k += 7, n++) s += n.toString(16).toUpperCase() + ':' + hx(all.slice(k, k + 7)) + '\r';
+      return s + '\r';
+    }
+    if (c.startsWith('01') && c.length === 4) {
+      const p = parseInt(c.slice(2), 16);
+      const SUP = [0x01, 0x04, 0x05, 0x06, 0x07, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x11, 0x2F, 0x42, 0x46];
+      if (p === 0x00 || p === 0x20 || p === 0x40) {
+        const m = [0, 0, 0, 0];
+        for (const s of SUP) if (s > p && s <= p + 32) { const i = s - p - 1; m[i >> 3] |= 0x80 >> (i & 7); }
+        if (SUP.some(s => s > p + 32)) m[3] |= 1;
+        return '41' + h1(p) + hx(m) + '\r\r';
+      }
+      const rpm = 760 + thr * 5300 + Math.random() * 25;
+      const V = {
+        0x01: this.cleared ? [0x00, 0x07, 0x65, 0x65] : [0x82, 0x07, 0x65, 0x01],
+        0x04: [(18 + thr * 70) * 2.55], 0x05: [Math.min(90, 45 + t * 1.5) + 40],
+        0x06: [128 + (Math.random() * 8 - 4) * 1.28], 0x07: [128 + 4 * 1.28],
+        0x0B: [30 + thr * 65], 0x0C: [(rpm * 4) >> 8, (rpm * 4) & 255], 0x0D: [0],
+        0x0E: [(8 + thr * 18 + 64) * 2], 0x0F: [24 + 40], 0x11: [(14 + thr * 80) * 2.55],
+        0x2F: [62 * 2.55], 0x42: [14100 >> 8, 14100 & 255], 0x46: [12 + 40],
+      }[p];
+      return V ? '41' + h1(p) + hx(V) + '\r\r' : 'NO DATA\r\r';
+    }
+    return '?\r\r';
+  }
+}
+
+let elm = null, elmMode = null, elmQueue = Promise.resolve();
+const polo = { can: true, proto: '', supported: null };
+
+// Команда адаптеру; запросы выполняются строго по одному и пишутся в журнал
+function elmCmd(text, timeout = 3000) {
+  const job = elmQueue.then(async () => {
+    log('tx', '→ ' + text);
+    try {
+      const r = await elm.raw(text, timeout);
+      const lines = r.split(/[\r\n]+/).map(s => s.trim()).filter(s => s && s !== text);
+      log('rx', '← ' + (lines.join(' | ') || '(пусто)'));
+      return lines;
+    } catch (e) { log('er', '✕ ' + (e.message === 'timeout' ? 'нет ответа от адаптера' : e.message)); throw e; }
+  });
+  elmQueue = job.catch(() => {});
+  return job;
+}
+async function obd(req, timeout = 3000) {
+  const lines = (await elmCmd(req, timeout)).filter(l => !/SEARCHING/i.test(l));
+  if (lines.some(l => /NO DATA/i.test(l))) throw new Error('nodata');
+  const err = lines.find(l => /ERROR|UNABLE|STOPPED|BUS|^\?$/i.test(l));
+  if (err) throw new Error(err);
+  return lines;
+}
+// Склеить ответ (в том числе многокадровый CAN: «014», «0:…», «1:…») в массив байт
+function obdBytes(lines) {
+  const out = [];
+  for (const l of lines) {
+    let s = l.replace(/\s/g, '');
+    if (/^[0-9A-F]{3}$/i.test(s)) continue;        // строка с длиной ответа
+    s = s.replace(/^[0-9A-F]:/i, '');
+    if (!/^[0-9A-F]+$/i.test(s)) continue;
+    for (let i = 0; i + 1 < s.length; i += 2) out.push(parseInt(s.slice(i, i + 2), 16));
+  }
+  return out;
+}
+async function readPid(p) {
+  const b = obdBytes(await obd('01' + h1(p)));
+  const i = b.findIndex((x, k) => x === 0x41 && b[k + 1] === p);
+  if (i < 0) throw new Error('неожиданный ответ');
+  return b.slice(i + 2);
+}
+async function elmInit() {
+  for (const c of ['ATE0', 'ATL0', 'ATS0', 'ATH0', 'ATAT1']) await elmCmd(c);
+  const probe = async t => { try { return obdBytes(await obd('0100', t)).includes(0x41); } catch { return false; } };
+  await elmCmd('ATSP6');                         // Polo 2013: CAN 11 бит, 500 кбит/с
+  let ok = await probe(4000);
+  if (!ok) { await elmCmd('ATSP0'); ok = await probe(12000); }   // запасной вариант — автоопределение
+  if (!ok) throw new Error('Блок двигателя не отвечает. Включите зажигание (приборная панель должна гореть) и попробуйте снова.');
+  const dpn = (await elmCmd('ATDPN'))[0] || '';
+  polo.can = /^A?[6-9AB]/i.test(dpn);
+  polo.proto = ((await elmCmd('ATDP'))[0] || '').replace(/^AUTO,\s*/i, '');
+  // Обращаемся только к двигателю (иначе на общий запрос отвечают и другие блоки)
+  if (polo.can) { await elmCmd('ATSH7E0'); await elmCmd('ATCRA7E8'); }
+}
+async function supportedPids() {
+  const set = new Set();
+  for (const base of [0x00, 0x20, 0x40]) {
+    let d;
+    try { d = await readPid(base); } catch { break; }
+    for (let i = 0; i < 32; i++) if (d[i >> 3] & (0x80 >> (i & 7))) set.add(base + i + 1);
+    if (!set.has(base + 0x20)) break;
+  }
+  return set;
+}
+async function poloConnect(kind) {
+  try {
+    elm = kind === 'demo' ? new ElmDemo() : new ElmTransport();
+    elmQueue = Promise.resolve();
+    await elm.open();
+    elmMode = kind;
+    await elmInit();
+    polo.supported = await supportedPids();
+    log('inf', `VW Polo: связь установлена (${polo.proto}), параметров для чтения: ${polo.supported.size}.`);
+    announce(kind === 'demo' ? 'Включён демо-режим VW Polo' : 'ELM327 подключён, связь с двигателем есть');
+  } catch (e) {
+    try { await elm?.close(); } catch {}
+    elm = null; elmMode = null;
+    if (e.name !== 'NotFoundError') modal('Ошибка подключения', esc(e.message === 'timeout' ? 'Адаптер не ответил. Проверьте, что он вставлен в разъём и выбран правильный порт.' : e.message), [['OK', 0, 1]]);
+  }
+  render();
+}
+async function poloDisconnect() {
+  stopPoll(); try { await elm?.close(); } catch {}
+  elm = null; elmMode = null; polo.supported = null; polo.proto = '';
+  log('inf', 'VW Polo: адаптер отключён.'); announce('Адаптер отключён');
+  render();
+}
+const needElm = () => { if (!elm) { modal('Нет связи', 'Сначала подключите ELM327 или включите демо-режим в разделе VW Polo.', [['OK', 0, 1]]); return true; } return false; };
+
+// --- Коды неисправностей OBD2 ---
+async function readDtcs(mode) {           // '03' — подтверждённые, '07' — ожидающие, '0A' — постоянные
+  let lines;
+  try { lines = await obd(mode, 5000); } catch (e) { if (e.message === 'nodata') return []; throw e; }
+  const resp = parseInt(mode, 16) + 0x40;
+  let pairs = [];
+  if (polo.can) {
+    const b = obdBytes(lines), i = b.indexOf(resp);
+    if (i < 0) return [];
+    const n = b[i + 1];
+    pairs = b.slice(i + 2, i + 2 + n * 2);
+  } else {
+    for (const l of lines) { const b = obdBytes([l]); if (b[0] === resp) pairs.push(...b.slice(1, 7)); }
+  }
+  const out = [];
+  for (let k = 0; k + 1 < pairs.length; k += 2) {
+    const A = pairs[k], B = pairs[k + 1];
+    if (!A && !B) continue;
+    out.push('PCBU'[A >> 6] + ((A >> 4) & 3) + (A & 15).toString(16).toUpperCase() + h1(B));
+  }
+  return [...new Set(out)];
+}
+
+// Справочник кодов для Polo 2013 (1.6 MPI). Названия — по стандарту SAE J2012, советы — с учётом этого мотора.
+const OBD_DB = {};
+[
+  ['P0016', 'Рассогласование положения коленвала и распредвала', 'Crankshaft/Camshaft Position Correlation (Bank 1 Sensor A)', ['Частая причина на моторах 1.6 MPI — растянута цепь ГРМ: проверьте её у специалиста.', 'Проверьте датчики коленвала и распредвала и их разъёмы.', 'Проверьте уровень и состояние масла.']],
+  ['P0105', 'Неисправна цепь датчика давления во впускном коллекторе', 'Manifold Absolute Pressure/Barometric Pressure Circuit', ['Проверьте разъём и провода датчика на впускном коллекторе.', 'Проверьте вакуумные шланги на трещины.', 'При подтверждении — замена датчика.']],
+  ['P0106', 'Сигнал датчика давления во впуске вне нормы', 'Manifold Absolute Pressure/Barometric Pressure Circuit Range/Performance', ['Ищите подсос воздуха во впуске.', 'Очистите датчик давления от масляного налёта.', 'Проверьте вентиляцию картера.']],
+  ['P0107', 'Низкий сигнал датчика давления во впуске', 'Manifold Absolute Pressure/Barometric Pressure Circuit Low', ['Проверьте разъём датчика и провод питания 5 В.', 'Проверьте провода на обрыв и замыкание на массу.']],
+  ['P0108', 'Высокий сигнал датчика давления во впуске', 'Manifold Absolute Pressure/Barometric Pressure Circuit High', ['Проверьте разъём датчика и массу.', 'Проверьте провода на замыкание на плюс.']],
+  ['P0112', 'Низкий сигнал датчика температуры впускного воздуха', 'Intake Air Temperature Sensor 1 Circuit Low', ['Проверьте провода датчика на замыкание.', 'Датчик встроен в датчик давления во впуске — проверьте его разъём.']],
+  ['P0113', 'Высокий сигнал датчика температуры впускного воздуха', 'Intake Air Temperature Sensor 1 Circuit High', ['Проверьте разъём на окисление и провода на обрыв.']],
+  ['P0116', 'Сигнал датчика температуры охлаждающей жидкости вне нормы', 'Engine Coolant Temperature Circuit Range/Performance', ['Проверьте термостат: если он залип открытым, мотор долго греется.', 'Проверьте уровень антифриза.', 'Проверьте датчик температуры.']],
+  ['P0117', 'Низкий сигнал датчика температуры охлаждающей жидкости', 'Engine Coolant Temperature Circuit Low', ['Проверьте провода датчика на замыкание на массу.', 'Проверьте сам датчик и замените при неисправности.']],
+  ['P0118', 'Высокий сигнал датчика температуры охлаждающей жидкости', 'Engine Coolant Temperature Circuit High', ['Проверьте разъём датчика (часто ломается фиксатор) и провода на обрыв.']],
+  ['P0121', 'Сигнал датчика положения дросселя вне нормы', 'Throttle/Pedal Position Sensor/Switch A Circuit Range/Performance', ['Очистите дроссельный узел от нагара.', 'Проверьте разъём дроссельного узла.', 'После чистки нужна адаптация дросселя (VCDS / ВАСЯ Диагност).']],
+  ['P0122', 'Низкий сигнал датчика положения дросселя', 'Throttle/Pedal Position Sensor/Switch A Circuit Low', ['Проверьте разъём и провода дроссельного узла.', 'При исправной проводке — замена дроссельного узла.']],
+  ['P0123', 'Высокий сигнал датчика положения дросселя', 'Throttle/Pedal Position Sensor/Switch A Circuit High', ['Проверьте разъём и провода дроссельного узла.', 'При исправной проводке — замена дроссельного узла.']],
+  ['P0130', 'Неисправна цепь лямбда-зонда до катализатора', 'O2 Sensor Circuit (Bank 1 Sensor 1)', ['Проверьте разъём и провод зонда — он идёт рядом с горячим выпуском.', 'Проверьте выпуск на подсос перед зондом.', 'При подтверждении — замена зонда.']],
+  ['P0131', 'Низкое напряжение лямбда-зонда до катализатора', 'O2 Sensor Circuit Low Voltage (Bank 1 Sensor 1)', ['Ищите подсос воздуха во впуске и выпуске (бедная смесь).', 'Проверьте провода зонда на замыкание.']],
+  ['P0132', 'Высокое напряжение лямбда-зонда до катализатора', 'O2 Sensor Circuit High Voltage (Bank 1 Sensor 1)', ['Проверьте провода зонда на замыкание на плюс.', 'Проверьте, не подтекают ли форсунки (богатая смесь).']],
+  ['P0133', 'Медленный отклик лямбда-зонда до катализатора', 'O2 Sensor Circuit Slow Response (Bank 1 Sensor 1)', ['Зонд «состарился» — обычно его меняют.', 'Перед заменой проверьте выпуск на подсос.']],
+  ['P0134', 'Нет активности лямбда-зонда до катализатора', 'O2 Sensor Circuit No Activity Detected (Bank 1 Sensor 1)', ['Проверьте подогрев зонда и его предохранитель.', 'Проверьте разъём и провода.', 'При подтверждении — замена зонда.']],
+  ['P0135', 'Неисправна цепь подогрева лямбда-зонда до катализатора', 'O2 Sensor Heater Circuit (Bank 1 Sensor 1)', ['Проверьте предохранитель подогрева зондов.', 'Измерьте сопротивление нагревателя: обрыв — замена зонда.', 'Проверьте разъём и провода.']],
+  ['P0136', 'Неисправна цепь лямбда-зонда после катализатора', 'O2 Sensor Circuit (Bank 1 Sensor 2)', ['Проверьте разъём и провод второго зонда (под днищем, страдает от грязи и воды).', 'При подтверждении — замена зонда.']],
+  ['P0137', 'Низкое напряжение лямбда-зонда после катализатора', 'O2 Sensor Circuit Low Voltage (Bank 1 Sensor 2)', ['Проверьте выпуск на прогар и подсос перед вторым зондом.', 'Проверьте провода зонда.']],
+  ['P0138', 'Высокое напряжение лямбда-зонда после катализатора', 'O2 Sensor Circuit High Voltage (Bank 1 Sensor 2)', ['Проверьте провода зонда на замыкание.', 'При подтверждении — замена зонда.']],
+  ['P0141', 'Неисправна цепь подогрева лямбда-зонда после катализатора', 'O2 Sensor Heater Circuit (Bank 1 Sensor 2)', ['Проверьте предохранитель подогрева.', 'Измерьте сопротивление нагревателя: обрыв — замена зонда.']],
+  ['P0171', 'Смесь слишком бедная', 'System Too Lean (Bank 1)', ['Ищите подсос воздуха: шланги, прокладка впускного коллектора, клапан вентиляции картера.', 'Проверьте топливный фильтр и давление топлива.', 'Проверьте форсунки и лямбда-зонд.']],
+  ['P0172', 'Смесь слишком богатая', 'System Too Rich (Bank 1)', ['Проверьте, не подтекают ли форсунки.', 'Проверьте клапан продувки адсорбера (может быть открыт постоянно).', 'Проверьте датчик давления во впуске и лямбда-зонд.']],
+  ['P0300', 'Пропуски воспламенения в разных цилиндрах', 'Random/Multiple Cylinder Misfire Detected', ['Проверьте свечи (износ, зазор, нагар) и катушки зажигания.', 'Проверьте качество топлива.', 'Ищите подсос воздуха; при подозрении — замерьте компрессию.']],
+  ['P0301', 'Пропуски воспламенения в 1-м цилиндре', 'Cylinder 1 Misfire Detected', ['Поменяйте катушку 1-го цилиндра местами с соседней: если ошибка «переехала» — неисправна катушка.', 'Проверьте свечу 1-го цилиндра.', 'Проверьте форсунку и компрессию в 1-м цилиндре.']],
+  ['P0302', 'Пропуски воспламенения во 2-м цилиндре', 'Cylinder 2 Misfire Detected', ['Поменяйте катушку 2-го цилиндра местами с соседней: если ошибка «переехала» — неисправна катушка.', 'Проверьте свечу 2-го цилиндра.', 'Проверьте форсунку и компрессию во 2-м цилиндре.']],
+  ['P0303', 'Пропуски воспламенения в 3-м цилиндре', 'Cylinder 3 Misfire Detected', ['Поменяйте катушку 3-го цилиндра местами с соседней: если ошибка «переехала» — неисправна катушка.', 'Проверьте свечу 3-го цилиндра.', 'Проверьте форсунку и компрессию в 3-м цилиндре.']],
+  ['P0304', 'Пропуски воспламенения в 4-м цилиндре', 'Cylinder 4 Misfire Detected', ['Поменяйте катушку 4-го цилиндра местами с соседней: если ошибка «переехала» — неисправна катушка.', 'Проверьте свечу 4-го цилиндра.', 'Проверьте форсунку и компрессию в 4-м цилиндре.']],
+  ['P0325', 'Неисправна цепь датчика детонации', 'Knock Sensor 1 Circuit (Bank 1 or Single Sensor)', ['Проверьте разъём датчика детонации (на блоке цилиндров) на окисление.', 'Проверьте момент затяжки датчика.', 'Проверьте провода; при исправных — замена датчика.']],
+  ['P0327', 'Низкий сигнал датчика детонации', 'Knock Sensor 1 Circuit Low (Bank 1 or Single Sensor)', ['Проверьте разъём и провода датчика детонации.', 'Проверьте затяжку датчика.']],
+  ['P0328', 'Высокий сигнал датчика детонации', 'Knock Sensor 1 Circuit High (Bank 1 or Single Sensor)', ['Проверьте провода датчика на замыкание.', 'Проверьте затяжку датчика.']],
+  ['P0335', 'Нет сигнала датчика положения коленвала', 'Crankshaft Position Sensor A Circuit', ['Проверьте разъём и провода датчика коленвала.', 'Проверьте датчик на загрязнение.', 'При неисправном датчике двигатель не заводится или глохнет.']],
+  ['P0340', 'Нет сигнала датчика положения распредвала', 'Camshaft Position Sensor A Circuit (Bank 1 or Single Sensor)', ['Проверьте разъём и провода датчика распредвала.', 'При исправной проводке — замена датчика.']],
+  ['P0420', 'Низкая эффективность катализатора', 'Catalyst System Efficiency Below Threshold (Bank 1)', ['Сначала убедитесь, что нет пропусков зажигания и проблем со смесью — они губят катализатор.', 'Проверьте второй лямбда-зонд.', 'Проверьте выпуск на прогар; при подтверждении — ремонт или замена катализатора.']],
+  ['P0441', 'Неправильный расход через систему продувки адсорбера', 'Evaporative Emission System Incorrect Purge Flow', ['Проверьте клапан продувки адсорбера и его шланги.', 'Проверьте, плотно ли закрыта крышка бензобака.']],
+  ['P0443', 'Неисправна цепь клапана продувки адсорбера', 'Evaporative Emission System Purge Control Valve Circuit', ['Проверьте разъём и провода клапана.', 'Подайте 12 В на клапан — он должен щёлкать; если нет — замена.']],
+  ['P0505', 'Неисправность системы холостого хода', 'Idle Air Control System', ['Очистите дроссельный узел.', 'Выполните адаптацию дросселя (VCDS / ВАСЯ Диагност).', 'Ищите подсос воздуха.']],
+  ['P0506', 'Обороты холостого хода ниже нормы', 'Idle Air Control System RPM Lower Than Expected', ['Очистите дроссельный узел от нагара.', 'Проверьте, нет ли большой нагрузки (генератор, кондиционер).']],
+  ['P0507', 'Обороты холостого хода выше нормы', 'Idle Air Control System RPM Higher Than Expected', ['Ищите подсос воздуха во впуске.', 'Проверьте дроссельный узел и выполните его адаптацию.']],
+  ['P0562', 'Низкое напряжение бортсети', 'System Voltage Low', ['Проверьте аккумулятор и генератор: на работающем моторе должно быть 13,8–14,5 В.', 'Проверьте клеммы и массу двигателя.']],
+  ['P0563', 'Высокое напряжение бортсети', 'System Voltage High', ['Проверьте регулятор напряжения генератора.', 'Проверьте массу генератора.']],
+  ['P0601', 'Ошибка памяти блока управления двигателем', 'Internal Control Module Memory Check Sum Error', ['Сотрите код и проверьте, вернётся ли он.', 'Проверьте питание и массу блока.', 'Если возвращается — блоку нужна проверка или перепрошивка у специалиста.']],
+  ['P0638', 'Дроссельная заслонка не отрабатывает команды', 'Throttle Actuator Control Range/Performance (Bank 1)', ['Очистите дроссельный узел — частая причина на Polo.', 'Проверьте разъём дроссельного узла.', 'После чистки выполните адаптацию (VCDS / ВАСЯ Диагност).']],
+  ['P0650', 'Неисправна цепь лампы Check Engine', 'Malfunction Indicator Lamp (MIL) Control Circuit', ['Проверьте, загорается ли лампа при включении зажигания.', 'Проверьте связь с приборной панелью.']],
+  ['P2096', 'Смесь бедная по данным второго лямбда-зонда', 'Post Catalyst Fuel Trim System Too Lean (Bank 1)', ['Ищите подсос в выпуске между зондами.', 'Проверьте первый лямбда-зонд.']],
+  ['P2097', 'Смесь богатая по данным второго лямбда-зонда', 'Post Catalyst Fuel Trim System Too Rich (Bank 1)', ['Проверьте первый лямбда-зонд и форсунки.', 'Проверьте катализатор.']],
+  ['P2101', 'Неисправна цепь мотора дроссельной заслонки', 'Throttle Actuator Control Motor Circuit Range/Performance', ['Проверьте разъём дроссельного узла.', 'Очистите заслонку и выполните адаптацию.', 'Если не помогло — замена дроссельного узла.']],
+  ['P2135', 'Расхождение сигналов двух датчиков положения дросселя', 'Throttle/Pedal Position Sensor/Switch A/B Voltage Correlation', ['Проверьте разъём дроссельного узла на окисление.', 'Как правило, требуется замена дроссельного узла.']],
+  ['P2138', 'Расхождение сигналов двух датчиков педали газа', 'Throttle/Pedal Position Sensor/Switch D/E Voltage Correlation', ['Проверьте разъём педали газа.', 'Как правило, требуется замена педали (датчики встроены).']],
+  ['P2187', 'Смесь слишком бедная на холостом ходу', 'System Too Lean at Idle (Bank 1)', ['Почти всегда — подсос воздуха: клапан вентиляции картера, шланги, прокладка впускного коллектора.', 'Проверьте крышку маслозаливной горловины и щуп.', 'Проверьте давление топлива.']],
+  ['P2188', 'Смесь слишком богатая на холостом ходу', 'System Too Rich at Idle (Bank 1)', ['Проверьте клапан продувки адсорбера.', 'Проверьте форсунки на подтекание.']],
+  ['P2279', 'Подсос воздуха во впуске', 'Intake Air System Leak', ['Проверьте клапан вентиляции картера и его шланги — частая причина у VAG.', 'Проверьте все шланги и прокладку впускного коллектора.', 'Проверьте уплотнение дроссельного узла.']],
+  ['U0100', 'Нет связи с блоком двигателя', 'Lost Communication With ECM/PCM "A"', ['Проверьте питание и массу блока двигателя.', 'Проверьте шину CAN и разъёмы.']],
+  ['U0101', 'Нет связи с блоком коробки передач', 'Lost Communication With TCM', ['Проверьте питание блока АКПП и шину CAN.']],
+  ['U0121', 'Нет связи с блоком ABS', 'Lost Communication With Anti-Lock Brake System (ABS) Control Module', ['Проверьте предохранители и питание блока ABS.', 'Проверьте шину CAN.']],
+  ['U0155', 'Нет связи с приборной панелью', 'Lost Communication With Instrument Panel Cluster (IPC) Control Module', ['Проверьте питание приборной панели.', 'Проверьте шину CAN.']],
+].forEach(([code, plain, official, fix]) => { OBD_DB[code] = { plain, official, fix }; });
+
+// Если кода нет в справочнике — хотя бы группа по стандарту
+function obdInfo(code) {
+  if (OBD_DB[code]) return { ...OBD_DB[code], known: true };
+  const L = code[0], d1 = code[1], d2 = code[2];
+  // По SAE J2012 коды производителя: P1xxx, P30xx–P33xx, а также B1/B2, C1/C2, U1/U2
+  const manuf = d1 === '1' || (L === 'P' && d1 === '3' && d2 <= '3') || (L !== 'P' && d1 === '2');
+  if (manuf) return { plain: 'Код производителя (VAG)', official: 'Manufacturer controlled DTC', fix: ['Точную расшифровку смотрите в VCDS, «ВАСЯ Диагност» или у дилера VW.'] };
+  const groups = { P: { '0': 'топливо и воздух', '1': 'топливо и воздух', '2': 'топливо (форсунки)', '3': 'зажигание и пропуски', '4': 'системы снижения токсичности', '5': 'скорость и холостой ход', '6': 'блок управления и его цепи', '7': 'коробка передач', '8': 'коробка передач', '9': 'коробка передач', 'A': 'гибридная система' },
+                   C: 'шасси (ABS, ESP)', B: 'кузов', U: 'связь между блоками' };
+  const g = typeof groups[L] === 'string' ? groups[L] : groups[L]?.[d2] || 'прочее';
+  return { plain: `Код не найден в справочнике — группа: ${g}`, official: '', fix: ['Найдите расшифровку по номеру кода в документации VW или в VCDS.'] };
+}
+
+// --- Параметры двигателя (стандартные PID OBD2, формулы — по SAE J1979) ---
+const OBD_PIDS = [
+  { pid: 0x0C, name: 'Обороты двигателя', unit: 'об/мин', min: 0, max: 7000, warn: 6200, dec: 0, type: 'dial', calc: d => (d[0] * 256 + d[1]) / 4 },
+  { pid: 0x05, name: 'Температура ОЖ', unit: '°C', min: -40, max: 130, warn: 110, dec: 0, type: 'dial', calc: d => d[0] - 40 },
+  { pid: 0x0D, name: 'Скорость', unit: 'км/ч', min: 0, max: 220, warn: null, dec: 0, type: 'dial', calc: d => d[0] },
+  { pid: 0x11, name: 'Положение дросселя', unit: '%', min: 0, max: 100, warn: null, dec: 0, type: 'bar', calc: d => d[0] * 100 / 255 },
+  { pid: 0x04, name: 'Нагрузка двигателя', unit: '%', min: 0, max: 100, warn: null, dec: 0, type: 'bar', calc: d => d[0] * 100 / 255 },
+  { pid: 0x42, name: 'Напряжение бортсети', unit: 'В', min: 10, max: 16, warn: 15, dec: 1, type: 'number', calc: d => (d[0] * 256 + d[1]) / 1000 },
+  { pid: 0x0B, name: 'Давление во впуске', unit: 'кПа', min: 0, max: 110, warn: null, dec: 0, type: 'number', calc: d => d[0] },
+  { pid: 0x0F, name: 'Температура воздуха на впуске', unit: '°C', min: -40, max: 80, warn: null, dec: 0, type: 'number', calc: d => d[0] - 40 },
+  { pid: 0x0E, name: 'Угол опережения зажигания', unit: '°', min: -10, max: 50, warn: null, dec: 1, type: 'number', calc: d => d[0] / 2 - 64 },
+  { pid: 0x06, name: 'Краткосрочная коррекция топлива', unit: '%', min: -25, max: 25, warn: 20, dec: 1, type: 'bar', calc: d => (d[0] - 128) * 100 / 128 },
+  { pid: 0x07, name: 'Долгосрочная коррекция топлива', unit: '%', min: -25, max: 25, warn: 20, dec: 1, type: 'bar', calc: d => (d[0] - 128) * 100 / 128 },
+  { pid: 0x10, name: 'Расход воздуха', unit: 'г/с', min: 0, max: 100, warn: null, dec: 1, type: 'number', calc: d => (d[0] * 256 + d[1]) / 100 },
+  { pid: 0x2F, name: 'Уровень топлива', unit: '%', min: 0, max: 100, warn: null, dec: 0, type: 'bar', calc: d => d[0] * 100 / 255 },
+  { pid: 0x46, name: 'Температура снаружи', unit: '°C', min: -40, max: 60, warn: null, dec: 0, type: 'number', calc: d => d[0] - 40 },
+];
+async function poloPoll() {
+  if (state.poll) return;
+  const job = { stop: false }; state.poll = job;
+  syncPollButtons(); setLiveState('идёт опрос…');
+  while (!job.stop) {
+    for (const g of state.gauges) {
+      if (job.stop) break;
+      try { g.set(g.p.calc(await readPid(g.p.pid))); }
+      catch (e) { if (e.message === 'timeout') { if (!job.stop) { stopPoll(); setLiveState('адаптер не отвечает'); } return; } }
+    }
+    await sleep(60);
+  }
+}
+
+// Готовность систем (монитор OBD2) — то, что проверяют на техосмотре
+const READINESS = [
+  ['B', 0, 'Пропуски зажигания'], ['B', 1, 'Топливная система'], ['B', 2, 'Компоненты'],
+  ['C', 0, 'Катализатор'], ['C', 1, 'Подогрев катализатора'], ['C', 2, 'Система улавливания паров топлива'],
+  ['C', 3, 'Вторичный воздух'], ['C', 5, 'Лямбда-зонды'], ['C', 6, 'Подогрев лямбда-зондов'], ['C', 7, 'Рециркуляция газов (EGR)'],
+];
+function readinessRows(d) {
+  const [A, B, C, D] = d;
+  return READINESS.map(([byte, bit, name]) => {
+    const supported = byte === 'B' ? B & (1 << bit) : C & (1 << bit);
+    if (!supported) return null;
+    const incomplete = byte === 'B' ? B & (1 << (bit + 4)) : D & (1 << bit);
+    return { name, done: !incomplete };
+  }).filter(Boolean);
+}
+
+async function poloClear() {
+  if (state.clearing || needElm()) return;
+  state.clearing = true;
+  try {
+    const ok = await modal('Стирание ошибок двигателя', 'Стереть коды неисправностей двигателя?<br><br>Вместе с ними сбросится <b>готовность систем</b> — после стирания машине нужно проездить несколько дней, прежде чем все проверки снова будут пройдены.<br><br>Двигатель должен быть заглушен, зажигание включено.', [['Отмена', false], ['Стереть', true, 1]]);
+    if (!ok) return;
+    try {
+      const b = obdBytes(await obd('04', 5000));
+      const done = b.includes(0x44);
+      if (done) announce('Ошибки двигателя стёрты');
+      await modal('Стирание ошибок', done ? 'Ошибки стёрты. Если неисправность осталась, код скоро появится снова.' : 'Блок не подтвердил стирание. Заглушите двигатель, оставьте зажигание включённым и попробуйте ещё раз.', [['OK', 0, 1]]);
+    } catch (e) { await modal('Стирание ошибок', esc(e.message === 'timeout' ? 'Адаптер не ответил.' : e.message) + '<br><br>Проверьте подключение и попробуйте ещё раз.', [['OK', 0, 1]]); }
+    if (cur().screen === 'polodtc') go('polodtc', cur().params, true);
+  } finally { state.clearing = false; }
 }
 
 // ===================== Тема =====================
